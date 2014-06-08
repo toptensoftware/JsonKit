@@ -21,7 +21,8 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 ## Setup
 
 1. Add PetaJson.cs to your project
-2. That's it
+2. Optionally add "using PetaJson;" clauses as required
+3. That's it
 
 ## Generating JSON
 
@@ -139,6 +140,28 @@ Use the JsonExclude attribute to exclude public fields/properties from serializa
 			get { return calculateAge(); }
 		}
 	}
+
+Sometimes you'll want sub-objects to be serialized into the existing object instance.
+
+eg: 
+
+	class MyApp
+	{
+		public MyApp()
+		{
+			// Settings object has an owner pointer back to this so during
+			// serialization we don't want to create a new instance of the settings
+			// object.
+			CurrentSettings = new Settings(this);
+		}
+
+		[Json(KeepInstance=true)]
+		Settings CurrentSettings;
+	}
+
+In this example the existing CurrentSettings object will be instantiated into. If KeepInstance
+was set to false, PetaJson would instantiate a new Settings object, load it and then assign
+it to the CurrentSettings property.
 
 
 ## Custom Formatting
