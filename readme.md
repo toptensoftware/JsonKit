@@ -75,7 +75,7 @@ Or an array:
 
 Strongly typed object:
 
-	Person person = Json.Parse<Person>(jsonFromPersonExampleAboveExample);
+	Person person = Json.Parse<Person>(jsonFromPersonExampleAbove);
 	Console.WriteLine(person.Name);
 	Console.WriteLine(person.Address);
 
@@ -90,7 +90,7 @@ Into an existing instance:
 
 String into existing instance:
 
-	Json.ParseInto<Person>(jsonFromPersonExampleAboveExample, person);
+	Json.ParseInto<Person>(jsonFromPersonExampleAbove, person);
 
 
 ## Attributes
@@ -342,7 +342,7 @@ Non-strict parsing allows the following:
 eg: the non-strict parser will allow this:
 
 	{
-		/* This is C-style a comment */
+		/* This is a C-style comment */
 		"quotedKey": "allowed",
 		nonQuotedKey: "also allowed",
 		"arrayWithTrailingComma": [1,2,3,],	
