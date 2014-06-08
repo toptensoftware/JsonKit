@@ -9,6 +9,7 @@ namespace TestCases
     {
         static void Main(string[] args)
         {
+            PetaTest.Runner.RunMain(args);
         }
     }
 }

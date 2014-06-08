@@ -42,14 +42,17 @@ namespace PetaJson
         // Parse an object of specified type from a text reader
         public static object Parse(TextReader r, Type type)
         {
-            var reader = new Internal.Reader(r);
+            Internal.Reader reader = null;
             try
             {
-                return reader.Parse(type);
+                reader = new Internal.Reader(r);
+                var retv = reader.Parse(type);
+                reader.CheckEOF();
+                return retv;
             }
             catch (Exception x)
             {
-                throw new JsonParseException(x, reader.CurrentTokenPosition);
+                throw new JsonParseException(x, reader==null ? new JsonLineOffset() : reader.CurrentTokenPosition);
             }
         }
 
@@ -62,14 +65,16 @@ namespace PetaJson
         // Parse from text reader into an already instantied object
         public static void ParseInto(TextReader r, Object into)
         {
-            var reader = new Internal.Reader(r);
+            Internal.Reader reader = null;
             try
             {
+                reader = new Internal.Reader(r);
                 reader.ParseInto(into);
+                reader.CheckEOF();
             }
             catch (Exception x)
             {
-                throw new JsonParseException(x, reader.CurrentTokenPosition);
+                throw new JsonParseException(x, reader==null ? new JsonLineOffset() : reader.CurrentTokenPosition);
             }
         }
 
@@ -374,6 +379,11 @@ namespace PetaJson
                 var retv = converter(_tokenizer.Literal);
                 _tokenizer.NextToken();
                 return retv;
+            }
+
+            public void CheckEOF()
+            {
+                _tokenizer.Check(Token.EOF);
             }
 
             public object Parse(Type type)
@@ -1670,6 +1680,15 @@ namespace PetaJson
                     case 'n': _sb.Append('\n'); break;
                     case 't': _sb.Append('\t'); break;
                     case '0': _sb.Append('\0'); break;
+                    case 'u':
+						var sbHex = new StringBuilder();
+						for (int i = 0; i < 4; i++)
+						{
+							sbHex.Append(_state._currentChar);
+							NextChar();
+						}
+						_sb.Append((char)Convert.ToUInt16(sbHex.ToString(), 16));
+                        break;
 
                     default:
                         throw new InvalidDataException(string.Format("Invalid escape sequence in string literal: '\\{0}'", _state._currentChar));
