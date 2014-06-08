@@ -131,7 +131,7 @@ Use the JsonExclude attribute to exclude public fields/properties from serializa
 	class Person
 	{
 		public string Name;		// Serialized as "name"
-		public string Address;	// Serialized as "Address"
+		public string Address;	// Serialized as "address"
 
 		[JsonExclude]			// Not serialized
 		public int Age
@@ -341,11 +341,11 @@ Non-strict parsing allows the following:
 
 eg: the non-strict parser will allow this:
 
-{
-	/* This is C-style a comment */
-	"quotedKey": "allowed",
-	nonQuotedKey: "also allowed",
-	"arrayWithTrailingComma": [1,2,3,],	
-	"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
-}
+	{
+		/* This is C-style a comment */
+		"quotedKey": "allowed",
+		nonQuotedKey: "also allowed",
+		"arrayWithTrailingComma": [1,2,3,],	
+		"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
+	}
 
