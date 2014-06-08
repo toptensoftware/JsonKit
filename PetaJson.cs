@@ -12,40 +12,85 @@ using System.Dynamic;
 
 namespace PetaJson
 {
+    [Flags]
+    public enum JsonOptions
+    {
+        None = 0,
+        WriteWhitespace  = 0x00000001,
+        DontWriteWhitespace = 0x00000002,
+        StrictParser = 0x00000004,
+        NonStrictParser = 0x00000008,
+    }
+
     public static class Json
     {
-        // Write an object to a text writer
-        public static void Write(TextWriter w, object o)
+        static Json()
         {
-            var writer = new Internal.Writer(w);
+            WriteWhitespaceDefault = true;
+            StrictParserDefault = false;
+        }
+
+        public static bool WriteWhitespaceDefault
+        {
+            get;
+            set;
+        }
+
+        public static bool StrictParserDefault
+        {
+            get;
+            set;
+        }
+
+        static JsonOptions ResolveOptions(JsonOptions options)
+        {
+            JsonOptions resolved = JsonOptions.None;
+
+            if ((options & (JsonOptions.WriteWhitespace|JsonOptions.DontWriteWhitespace))!=0)
+                resolved |= options & (JsonOptions.WriteWhitespace | JsonOptions.DontWriteWhitespace);
+            else
+                resolved |= WriteWhitespaceDefault ? JsonOptions.WriteWhitespace : JsonOptions.DontWriteWhitespace;
+
+            if ((options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser)) != 0)
+                resolved |= options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser);
+            else
+                resolved |= StrictParserDefault ? JsonOptions.StrictParser : JsonOptions.NonStrictParser;
+
+            return resolved;
+        }
+
+        // Write an object to a text writer
+        public static void Write(TextWriter w, object o, JsonOptions options = JsonOptions.None)
+        {
+            var writer = new Internal.Writer(w, ResolveOptions(options));
             writer.WriteValue(o);
         }
 
         // Write an object to a file
-        public static void WriteFile(string filename, object o)
+        public static void WriteFile(string filename, object o, JsonOptions options = JsonOptions.None)
         {
             using (var w = new StreamWriter(filename))
             {
-                Write(w, o);
+                Write(w, o, options);
             }
         }
 
         // Format an object as a json string
-        public static string Format(object o)
+        public static string Format(object o, JsonOptions options = JsonOptions.None)
         {
             var sw = new StringWriter();
-            var writer = new Internal.Writer(sw);
+            var writer = new Internal.Writer(sw, ResolveOptions(options));
             writer.WriteValue(o);
             return sw.ToString();
         }
 
         // Parse an object of specified type from a text reader
-        public static object Parse(TextReader r, Type type)
+        public static object Parse(TextReader r, Type type, JsonOptions options = JsonOptions.None)
         {
             Internal.Reader reader = null;
             try
             {
-                reader = new Internal.Reader(r);
+                reader = new Internal.Reader(r, ResolveOptions(options));
                 var retv = reader.Parse(type);
                 reader.CheckEOF();
                 return retv;
@@ -57,18 +102,18 @@ namespace PetaJson
         }
 
         // Parse an object of specified type from a text reader
-        public static T Parse<T>(TextReader r)
+        public static T Parse<T>(TextReader r, JsonOptions options = JsonOptions.None)
         {
-            return (T)Parse(r, typeof(T));
+            return (T)Parse(r, typeof(T), options);
         }
 
         // Parse from text reader into an already instantied object
-        public static void ParseInto(TextReader r, Object into)
+        public static void ParseInto(TextReader r, Object into, JsonOptions options = JsonOptions.None)
         {
             Internal.Reader reader = null;
             try
             {
-                reader = new Internal.Reader(r);
+                reader = new Internal.Reader(r, ResolveOptions(options));
                 reader.ParseInto(into);
                 reader.CheckEOF();
             }
@@ -79,48 +124,48 @@ namespace PetaJson
         }
 
         // Parse an object of specified type from a text reader
-        public static object ParseFile(string filename, Type type)
+        public static object ParseFile(string filename, Type type, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
             {
-                return Parse(r, type);
+                return Parse(r, type, options);
             }
         }
 
         // Parse an object of specified type from a text reader
-        public static T ParseFile<T>(string filename)
+        public static T ParseFile<T>(string filename, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
             {
-                return Parse<T>(r);
+                return Parse<T>(r, options);
             }
         }
 
         // Parse from text reader into an already instantied object
-        public static void ParseFileInto(string filename, Object into)
+        public static void ParseFileInto(string filename, Object into, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
             {
-                ParseInto(r, into);
+                ParseInto(r, into, options);
             }
         }
 
         // Parse an object from a string
-        public static object Parse(string data, Type type)
+        public static object Parse(string data, Type type, JsonOptions options = JsonOptions.None)
         {
-            return Parse(new StringReader(data), type);
+            return Parse(new StringReader(data), type, options);
         }
 
         // Parse an object from a string
-        public static T Parse<T>(string data)
+        public static T Parse<T>(string data, JsonOptions options = JsonOptions.None)
         {
-            return (T)Parse<T>(new StringReader(data));
+            return (T)Parse<T>(new StringReader(data), options);
         }
 
         // Parse from string into an already instantiated object
-        public static void ParseInto(string data, Object into)
+        public static void ParseInto(string data, Object into, JsonOptions options = JsonOptions.None)
         {
-            ParseInto(new StringReader(data), into);
+            ParseInto(new StringReader(data), into, options);
         }
 
         public static T Clone<T>(T source)
@@ -357,12 +402,14 @@ namespace PetaJson
                 });
             }
 
-            public Reader(TextReader r)
+            public Reader(TextReader r, JsonOptions options)
             {
-                _tokenizer = new Tokenizer(r);
+                _tokenizer = new Tokenizer(r, options);
+                _options = options;
             }
 
             Tokenizer _tokenizer;
+            JsonOptions _options;
 
             public JsonLineOffset CurrentTokenPosition
             {
@@ -658,7 +705,7 @@ namespace PetaJson
                 {
                     // Parse the key
                     string key = null;
-                    if (_tokenizer.CurrentToken == Token.Identifier)
+                    if (_tokenizer.CurrentToken == Token.Identifier && (_options & JsonOptions.StrictParser)==0)
                     {
                         key = _tokenizer.String;
                     }
@@ -686,7 +733,13 @@ namespace PetaJson
                     }
 
                     if (_tokenizer.SkipIf(Token.Comma))
+                    {
+                        if ((_options & JsonOptions.StrictParser) != 0 && _tokenizer.CurrentToken == Token.CloseBrace)
+                        {
+                            throw new InvalidDataException("Trailing commas not allowed in strict mode");
+                        }
                         continue;
+                    }
                     break;
                 }
             }
@@ -700,7 +753,13 @@ namespace PetaJson
                     callback();
 
                     if (_tokenizer.SkipIf(Token.Comma))
+                    {
+                        if ((_options & JsonOptions.StrictParser)!=0 && _tokenizer.CurrentToken==Token.CloseSquare)
+                        {
+                            throw new InvalidDataException("Trailing commas not allowed in strict mode");
+                        }
                         continue;
+                    }
                     break;
                 }
 
@@ -752,11 +811,12 @@ namespace PetaJson
 
             public static Dictionary<Type, Action<IJsonWriter, object>> _typeWriters = new Dictionary<Type, Action<IJsonWriter, object>>();
 
-            public Writer(TextWriter w)
+            public Writer(TextWriter w, JsonOptions options)
             {
                 _writer = w;
                 _atStartOfLine = true;
                 _needElementSeparator = false;
+                _options = options;
             }
 
             TextWriter _writer;
@@ -764,14 +824,19 @@ namespace PetaJson
             public int IndentLevel;
             bool _atStartOfLine;
             bool _needElementSeparator = false;
+            JsonOptions _options;
             char _currentBlockKind = '\0';
 
             public void NextLine()
             {
                 if (_atStartOfLine)
                     return;
-                WriteRaw("\n");
-                WriteRaw(new string('\t', IndentLevel));
+
+                if ((_options & JsonOptions.WriteWhitespace)!=0)
+                {
+                    WriteRaw("\n");
+                    WriteRaw(new string('\t', IndentLevel));
+                }
                 _atStartOfLine = true;
             }
 
@@ -806,7 +871,7 @@ namespace PetaJson
                     throw new InvalidOperationException("Attempt to write dictionary element when not in dictionary block");
                 NextElement();
                 WriteStringLiteral(key);
-                WriteRaw(": ");
+                WriteRaw(((_options & JsonOptions.WriteWhitespace)!=0) ? ": " : ":");
             }
 
             public void WriteRaw(string str)
@@ -1301,9 +1366,10 @@ namespace PetaJson
 
         public class Tokenizer
         {
-            public Tokenizer(TextReader r)
+            public Tokenizer(TextReader r, JsonOptions options)
             {
                 _reader = new RewindableTextReader(r);
+                _options = options;
 
                 _state._nextCharPos.Line = 0;
                 _state._nextCharPos.Offset = 0;
@@ -1315,6 +1381,7 @@ namespace PetaJson
             }
 
             RewindableTextReader _reader;
+            JsonOptions _options;
             StringBuilder _sb = new StringBuilder();
             ReaderState _state;
 
@@ -1432,8 +1499,16 @@ namespace PetaJson
                             switch (_state._currentChar)
                             {
                                 case '/':
-                                    NextChar();
-                                    state = State.Slash;
+                                    if ((_options & JsonOptions.StrictParser)!=0)
+                                    {
+                                        // Comments not support in strict mode
+                                        throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _state._currentChar));
+                                    }
+                                    else
+                                    {
+                                        NextChar();
+                                        state = State.Slash;
+                                    }
                                     break;
 
                                 case '\"':
@@ -1478,9 +1553,12 @@ namespace PetaJson
                                     NextChar();
                                     state = State.BlockComment;
                                     break;
-                            }
 
-                            throw new InvalidDataException("syntax error - unexpected character after slash");
+                                default:
+                                    throw new InvalidDataException("syntax error - unexpected character after slash");
+                            }
+                            break;
+
 
                         case State.SingleLineComment:
                             if (_state._currentChar == '\r' || _state._currentChar == '\n')

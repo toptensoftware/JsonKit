@@ -72,6 +72,8 @@ namespace TestCases
             // Save it
             var json = Json.Format(shapes);
 
+            Console.WriteLine(json);
+
             // Check the object kinds were written out
             Assert.Contains(json, "\"kind\": \"Rectangle\"");
             Assert.Contains(json, "\"kind\": \"Ellipse\"");
