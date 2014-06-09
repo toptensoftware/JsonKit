@@ -433,12 +433,18 @@ The IJsonWriter interface writes to the Json output stream:
 
 *WriteStringLiteral* - writes a string literal to the output stream, including the surrounding quotes and
  escaping the content as required.
+
 *WriteRaw* - writes directly to the output stream.  Use for comments, or self genarated Json data.
+
 *WriteArray* - writes an array to the output stream.  The callback should write each element.
+
 *WriteDictionary* - writes a dictionary to the output stream.  The callback should write each element.
+
 *WriteValue* - formats and writes any object value.
+
 *WriteElement* - call from the callback of WriteArray to indicate that the next element is about to be 
 written.  Causes PetaJson to write separating commas and whitespace.
+
 *WriteKey* - call from the callback of WriteDictionary to write the key part of the next element.  Writes
 whitespace, separating commas, the key and it's quotes, the colon.
 
