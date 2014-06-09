@@ -120,7 +120,7 @@ will be serialized:
 		public string Address;		// Not serialized
 	}
 
-By default members are serialized using the name as the field or property with the first letter
+By default members are serialized using the name of the field or property with the first letter
 lowercased.  To override the serialized name, include the name as a parameter to the [Json] attribute:
 
 	class Person
@@ -214,10 +214,8 @@ We can now format and parse Points:
 	// Parse a Point
 	var point = Json.Parse<Point>("\"10,20\"");
 
-Note that in this example we're formatting the point to a string literal containing both
-the X and Y components of the Point.  The reader and writer objects passed to the callbacks
-however have methods for reading and writing any arbitrary json format - this example just 
-happens to use a string literal.
+Note that in this example we're formatting to a single string literal.  We can do more
+complex custom serialization using the IJsonReader and IJsonWriter interfaces - see below.
 
 ## Custom Factories
 
@@ -246,8 +244,8 @@ and we'd like to serialize a list of Shapes to Json like this:
 		// etc...
 	]
 
-In otherwords a value in the Json dictionary for each object determines the type of object that 
-needs to be instantiated for each element.
+In other words a value in the Json dictionary determines the type of object that 
+needs to be instantiated for that element.
 
 We can write out the shape kind by implementing the IJsonWriting interface which gets called
 before the other properties of the object are written:
@@ -270,11 +268,11 @@ For parsing, we need to register a callback function that creates the correct in
         // This method will be called back for each key in the json dictionary
         // until an object instance is returned
 
-        // We saved the object type in a key called "kind", look for it
+        // We wrote the object type using the key "kind", look for it
         if (key != "kind")
             return null;
 
-        // Read the next literal (which better be a string) and instantiate the object
+        // Read the next literal and instantiate the correct object type
         return reader.ReadLiteral(literal =>
         {
             switch ((string)literal)
@@ -289,11 +287,11 @@ For parsing, we need to register a callback function that creates the correct in
 
 When attempting to deserialize Shape objects, the registered callback will be called with each 
 key in the dictionary until it returns an object instance.  In this case we're looking for a key
-named "kind" and we use it's value to create a new Rectangle or Ellipse instance.
+named "kind" and we use it's value to create either a Rectangle or Ellipse.
 
 Note that the field used to hold the type (ie: "kind") does not need to be the first field in the
  in the dictionary being parsed. After instantiating the object, the input stream is re-wound to the
- start of the dictionary and then re-parsed directly into the instantiated object.  Note too that
+ start of the dictionary and then re-parsed into the instantiated object.  Note too that
  the underlying stream doesn't need to support seeking - the rewind mechanism is implemented in 
  PetaJson.
 
@@ -334,7 +332,7 @@ by implementing one or more of the following interfaces:
     }
 
 
-For example, it's often necessary to wire up ownership references on loaded subobjects:
+For example, it's often necessary to wire up ownership references on loaded sub-objects:
 
 	class Drawing : IJsonLoaded
 	{
