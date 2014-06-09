@@ -2,15 +2,15 @@
 
 PetaJson is a simple but flexible JSON library implemented in a single C# file.  Features include:
 
-* Standard JSON format parsing and generation
-* Supports strongly typed serialization through reflection, or custom code
+* Standard JSON parsing and generation
+* Supports strongly typed serialization through reflection or custom code
 * Supports weakly typed serialization
 * Supports standard C# collection classes - no JSON specific classes (ie: no "JArray", "JObject" etc...)
 * Support for dynamic Expando (read) and anonymous types (write)
 * Custom formatting and parsing of any type
 * Support for serialization of abstract/virtual types
 * Directly reads from TextReader and writes to TextWriter and any underlying stream
-* Simple set of custom attributes to control serialization of types
+* Simple set of custom attributes to control serialization
 * Optional non-strict parsing allows comments, non-quoted dictionary keys and trailing commas (great for config files)
 * Optional pretty formatting
 * No dependencies, one file - PetaJson.cs
@@ -86,32 +86,32 @@ From a file:
 
 	var person = Json.ParseFile<Person>("aboutme.json");
 
-Into an existing instance:
+String into an existing instance:
+
+	Json.ParseInto<Person>(jsonFromPersonExampleAbove, person);
+
+From file into an existing instance:
 
 	var person = new Person();
 	Json.ParseFileInto<Person>("aboutme.json", person);
-
-String into existing instance:
-
-	Json.ParseInto<Person>(jsonFromPersonExampleAbove, person);
 
 
 ## Attributes
 
 PetaJson provides two attributes for decorating objects for serialization - [Json] and [JsonExclude].
 
-The Json attribute when applied to a class or struct marks all public properties and fields for serialization:
+The [Json] attribute when applied to a class or struct marks all public properties and fields for serialization:
 
 	[Json]
 	class Person
 	{
 		public string Name;				// Serialized as "name"
 		public string Address;			// Serialized as "address"
-		public string alsoSerialized;	// Serialized as "alsoSerialized"
+		public string AlsoSerialized;	// Serialized as "alsoSerialized"
 		private string NotSerialized;
 	}
 
-When applied to one or more field/properties but not applied to the class itself, only the decorated members
+When applied to one or more field or properties but not applied to the class itself, only the decorated members
 will be serialized:
 
 	class Person
@@ -120,15 +120,15 @@ will be serialized:
 		public string Address;		// Not serialized
 	}
 
-By default, members are serialized using the same name as the field or properties, but with the first letter
-lowercased.  To override the serialized name, include the name as a parameter to the Json attribute:
+By default members are serialized using the name as the field or property with the first letter
+lowercased.  To override the serialized name, include the name as a parameter to the [Json] attribute:
 
 	class Person
 	{
 		[Json("PersonName")] public string Name; 	// Serialized as "PersonName"
 	}
 
-Use the JsonExclude attribute to exclude public fields/properties from serialization
+Use the [JsonExclude] attribute to exclude public fields or properties from serialization
 
 	[Json]
 	class Person
@@ -143,7 +143,7 @@ Use the JsonExclude attribute to exclude public fields/properties from serializa
 		}
 	}
 
-Sometimes you'll want sub-objects to be serialized into the existing object instance.
+Sometimes you'll want sub-objects to be serialized into an existing object instance.
 
 eg: 
 
@@ -151,9 +151,8 @@ eg:
 	{
 		public MyApp()
 		{
-			// Settings object has an owner pointer back to this so during
-			// serialization we don't want to create a new instance of the settings
-			// object.
+			// Settings object has an owner reference that needs to be maintained
+			// across serialization
 			CurrentSettings = new Settings(this);
 		}
 
@@ -161,7 +160,7 @@ eg:
 		Settings CurrentSettings;
 	}
 
-In this example the existing CurrentSettings object will be instantiated into. If KeepInstance
+In this example the existing CurrentSettings object will be serialized into. If KeepInstance
 was set to false, PetaJson would instantiate a new Settings object, load it and then assign
 it to the CurrentSettings property.
 
@@ -176,7 +175,14 @@ Custom formatting can be used for any type.  Say we have the following type:
         public int Y;
     }
 
-We can serialize these as a string in the format "x,y" by registering a formatter
+and we want to serialize points as a comma separated string like this:
+
+	{
+		"TopLeft": "10,20",
+		"BottomRight: "30,40",
+	}
+
+To do this, we need to register a formatter:
 
     // Register custom formatter
     Json.RegisterFormatter<Point>( (writer,point) => 
@@ -184,7 +190,7 @@ We can serialize these as a string in the format "x,y" by registering a formatte
         writer.WriteStringLiteral(string.Format("{0},{1}", point.X, point.Y));
     });
 
-We also need a custom parser:
+And a custom parser:
 
     Json.RegisterParser<Point>( literal => {
 
@@ -200,7 +206,7 @@ We also need a custom parser:
 
     });
 
-We can now format and parse Point structs:
+We can now format and parse Points:
 
 	// Format a Point
 	var json = Json.Format(new Point() { X= 10, Y=20 });		// "10,20"
@@ -210,8 +216,8 @@ We can now format and parse Point structs:
 
 Note that in this example we're formatting the point to a string literal containing both
 the X and Y components of the Point.  The reader and writer objects passed to the callbacks
-however have methods for reading and writing any arbitrary json format - I just happened to
-use a single string literal for this example.
+however have methods for reading and writing any arbitrary json format - this example just 
+happens to use a string literal.
 
 ## Custom factories
 
@@ -235,15 +241,16 @@ Suppose we have a class heirarchy something like this:
 and we'd like to serialize a list of Shapes to Json like this:
 
 	[
-		{ "kind": "Rectangle", /* omitted */ },
-		{ "kind": "Shape", /* omitted */ },
+		{ "kind": "Rectangle", /* other rectangle properties omitted */ },
+		{ "kind": "Shape", /* other ellipse properties omitted */ },
 		// etc...
 	]
 
-In otherwords a key value in the dictionary for each object determines the type of object that 
+In otherwords a value in the Json dictionary for each object determines the type of object that 
 needs to be instantiated for each element.
 
-We can do this by firstly writing the element kind when saving using the IJsonWriting interface
+We can write out the shape kind by implementing the IJsonWriting interface which gets called
+before the other properties of the object are written:
 
     abstract class Shape : IJsonWriting
     {
@@ -255,7 +262,7 @@ We can do this by firstly writing the element kind when saving using the IJsonWr
         }
     }
 
-For parsing, we need to register a callback function that creates the correct instances of Shape:
+For parsing, we need to register a callback function that creates the correct instances:
 
     // Register a type factory that can instantiate Shape objects
     Json.RegisterTypeFactory(typeof(Shape), (reader, key) =>
@@ -284,8 +291,8 @@ When attempting to deserialize Shape objects, the registered callback will be ca
 key in the dictionary until it returns an object instance.  In this case we're looking for a key
 named "kind" and we use it's value to create a new Rectangle or Ellipse instance.
 
-Note that the field used to hold the type (aka "kind") does not need to be the first field in the
- in the dictionary being parsed. After instantiating the object, the input stream is rewound to the
+Note that the field used to hold the type (ie: "kind") does not need to be the first field in the
+ in the dictionary being parsed. After instantiating the object, the input stream is re-wound to the
  start of the dictionary and then re-parsed directly into the instantiated object.  Note too that
  the underlying stream doesn't need to support seeking - the rewind mechanism is implemented in 
  PetaJson.
@@ -327,7 +334,7 @@ by implementing one or more of the following interfaces:
     }
 
 
-For example, it's often necessary to wire up ownership chains on loaded subobjects:
+For example, it's often necessary to wire up ownership references on loaded subobjects:
 
 	class Drawing : IJsonLoaded
 	{
@@ -344,21 +351,24 @@ For example, it's often necessary to wire up ownership chains on loaded subobjec
 		}
 	}
 
+Note: although these methods could have been implemented using reflection rather than interfaces,
+the use of interfaces is more discoverable through Intellisense/Autocomplete.
+
 ## Options
 
-PetaJson has a couple of options that can be set as global defaults:
+PetaJson has a couple of formatting/parsing options. These can be set as global defaults:
 
 	Json.WriteWhitespaceDefault = true;		// Pretty formatting
 	Json.StrictParserDefault = true;		// Enable strict parsing
 
-or, overridden on a case by case basis:
+or, provided on a case by case basis:
 
 	Json.Format(person, JsonOption.DontWriteWhitespace);		// Force pretty formatting off
 	Json.Format(person, JsonOption.WriteWhitespace);			// Force pretty formatting on
 	Json.Parse<object>(jsonData, JsonOption.StrictParser);		// Force strict parsing
 	Json.Parse<object>(jsonData, JsonOption.NonStrictParser);	// Disable strict parsing
 
-Non-strict parsing allows the following:
+Non-strict mode relaxes the parser to allow:
 
 * Inline C /* */ or C++ // style comments
 * Trailing commas in arrays and dictionaries
@@ -374,3 +384,81 @@ eg: the non-strict parser will allow this:
 		"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
 	}
 
+
+## IJsonReader and IJsonWriter
+
+These interfaces only need to be used when writing custom formatters and parsers.  They are the low
+level interfaces used to read and write the Json stream.
+
+The IJsonReader interface reads from the Json input stream.  
+
+    public interface IJsonReader
+    {
+        object ReadLiteral(Func<object, object> converter);
+        void ReadDictionary(Action<string> callback);
+        void ReadArray(Action callback);
+        object Parse(Type type);
+        T Parse<T>();
+    }
+
+*ReadLiteral* - reads a single literal value from the input stream.  Throws an exception if
+the next token isn't a literal value.  You should provide a callback that converts the raw
+literal to the required value, which will then be returned as the return value from ReadLiteral.
+
+Wherever possible, conversion should be done in the callback to ensure that errors in the conversion
+report the error location just before the bad literal, instead of after it.
+
+
+*ReadDictionary* - reads a Json dictionary, calling the callback for each key encountered.  The
+callback routine should read the key's value using the IJsonReader interface.  If nothing is read
+by the callback, PetaJson will skip the value and move onto the next key.
+
+*ReadArray* - reads a Json array, calling the callback at each element position. The callback 
+routine must read each value from the IJsonReader before returning.
+
+*Parse* - parses a typed value from the input stream.
+
+The IJsonWriter interface writes to the Json output stream:
+
+    public interface IJsonWriter
+    {
+        void WriteStringLiteral(string str);
+        void WriteRaw(string str);
+        void WriteArray(Action callback);
+        void WriteDictionary(Action callback);
+        void WriteValue(object value);
+        void WriteElement();
+        void WriteKey(string key);
+    }
+
+*WriteStringLiteral* - writes a string literal to the output stream, including the surrounding quotes and
+ escaping the content as required.
+*WriteRaw* - writes directly to the output stream.  Use for comments, or self genarated Json data.
+*WriteArray* - writes an array to the output stream.  The callback should write each element.
+*WriteDictionary* - writes a dictionary to the output stream.  The callback should write each element.
+*WriteValue* - formats and writes any object value.
+*WriteElement* - call from the callback of WriteArray to indicate that the next element is about to be 
+written.  Causes PetaJson to write separating commas and whitespace.
+*WriteKey* - call from the callback of WriteDictionary to write the key part of the next element.  Writes
+whitespace, separating commas, the key and it's quotes, the colon.
+
+eg: to write a dictionary:
+
+	writer.WriteDictionary(() =>
+	{
+		writer.WriteKey("apples");
+		writer.WriteValue("red");
+		writer.WriteKey("bananas");
+		writer.WriteValue("yellow");
+	});
+
+eg: to write an array:
+
+	writer.WriteArray(()=>
+	{
+		for (int i=0; i<10; i++)
+		{
+			writer.WriteElement();
+			writer.WriteValue(i);
+		}
+	});
