@@ -388,7 +388,10 @@ eg: the non-strict parser will allow this:
 ## IJsonReader and IJsonWriter
 
 These interfaces only need to be used when writing custom formatters and parsers.  They are the low
-level interfaces used to read and write the Json stream.
+level interfaces used to read and write the Json stream and are passed to the callbacks for custom
+parsers and formatters.
+
+### IJsonReader
 
 The IJsonReader interface reads from the Json input stream.  
 
@@ -417,6 +420,8 @@ by the callback, PetaJson will skip the value and move onto the next key.
 routine must read each value from the IJsonReader before returning.
 
 *Parse* - parses a typed value from the input stream.
+
+### IJsonWriter
 
 The IJsonWriter interface writes to the Json output stream:
 
