@@ -1,4 +1,13 @@
-﻿using System;
+﻿/* PetaJson v0.5 - A simple but flexible Json library in a single .cs file.
+ *
+ * Copyright © 2014 Topten Software.  All Rights Reserved.
+ * 
+ * Apache License 2.0 - http://www.toptensoftware.com/petapoco/license
+ */
+
+// Define PETAJSON_DYNAMIC in your project settings for Expando support
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,12 +15,13 @@ using System.IO;
 using System.Reflection;
 using System.Globalization;
 using System.Collections;
-#if SIMPLEJSON_DYNAMIC
+#if PETAJSON_DYNAMIC
 using System.Dynamic;
 #endif
 
 namespace PetaJson
 {
+    // Pass to format/write/parse functions to override defaults
     [Flags]
     public enum JsonOptions
     {
@@ -22,6 +32,7 @@ namespace PetaJson
         NonStrictParser = 0x00000008,
     }
 
+    // API
     public static class Json
     {
         static Json()
@@ -30,33 +41,18 @@ namespace PetaJson
             StrictParserDefault = false;
         }
 
+        // Pretty format default
         public static bool WriteWhitespaceDefault
         {
             get;
             set;
         }
 
+        // Strict parser
         public static bool StrictParserDefault
         {
             get;
             set;
-        }
-
-        static JsonOptions ResolveOptions(JsonOptions options)
-        {
-            JsonOptions resolved = JsonOptions.None;
-
-            if ((options & (JsonOptions.WriteWhitespace|JsonOptions.DontWriteWhitespace))!=0)
-                resolved |= options & (JsonOptions.WriteWhitespace | JsonOptions.DontWriteWhitespace);
-            else
-                resolved |= WriteWhitespaceDefault ? JsonOptions.WriteWhitespace : JsonOptions.DontWriteWhitespace;
-
-            if ((options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser)) != 0)
-                resolved |= options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser);
-            else
-                resolved |= StrictParserDefault ? JsonOptions.StrictParser : JsonOptions.NonStrictParser;
-
-            return resolved;
         }
 
         // Write an object to a text writer
@@ -123,7 +119,7 @@ namespace PetaJson
             }
         }
 
-        // Parse an object of specified type from a text reader
+        // Parse an object of specified type from a file
         public static object ParseFile(string filename, Type type, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -132,7 +128,7 @@ namespace PetaJson
             }
         }
 
-        // Parse an object of specified type from a text reader
+        // Parse an object of specified type from a file
         public static T ParseFile<T>(string filename, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -141,7 +137,7 @@ namespace PetaJson
             }
         }
 
-        // Parse from text reader into an already instantied object
+        // Parse from file into an already instantied object
         public static void ParseFileInto(string filename, Object into, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -168,11 +164,13 @@ namespace PetaJson
             ParseInto(new StringReader(data), into, options);
         }
 
+        // Create a clone of an object
         public static T Clone<T>(T source)
         {
             return (T)Clone((object)source);
         }
 
+        // Create a clone of an object (untyped)
         public static object Clone(object source)
         {
             if (source == null)
@@ -181,11 +179,11 @@ namespace PetaJson
             return Parse(Format(source), source.GetType());
         }
 
+        // Clone an object into another instance
         public static void CloneInto<T>(T dest, T source)
         {
             ParseInto(Format(source), dest);
         }
-
 
         // Register a callback that can format a value of a particular type into json
         public static void RegisterFormatter(Type type, Action<IJsonWriter, object> formatter)
@@ -230,6 +228,25 @@ namespace PetaJson
         {
             Internal.Reader._typeFactories[type] = factory;
         }
+
+        // Resolve passed options        
+        static JsonOptions ResolveOptions(JsonOptions options)
+        {
+            JsonOptions resolved = JsonOptions.None;
+
+            if ((options & (JsonOptions.WriteWhitespace|JsonOptions.DontWriteWhitespace))!=0)
+                resolved |= options & (JsonOptions.WriteWhitespace | JsonOptions.DontWriteWhitespace);
+            else
+                resolved |= WriteWhitespaceDefault ? JsonOptions.WriteWhitespace : JsonOptions.DontWriteWhitespace;
+
+            if ((options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser)) != 0)
+                resolved |= options & (JsonOptions.StrictParser | JsonOptions.NonStrictParser);
+            else
+                resolved |= StrictParserDefault ? JsonOptions.StrictParser : JsonOptions.NonStrictParser;
+
+            return resolved;
+        }
+
     }
 
     // Called before loading via reflection
@@ -285,6 +302,7 @@ namespace PetaJson
         void WriteKey(string key);
     }
 
+    // Exception thrown for any parse error
     public class JsonParseException : Exception
     {
         public JsonParseException(Exception inner, JsonLineOffset position) : 
@@ -293,13 +311,14 @@ namespace PetaJson
         }
     }
 
+    // Stores a line, character offset in source file
     public struct JsonLineOffset
     {
         public int Line;
         public int Offset;
         public override string ToString()
         {
-            return string.Format("line {0}, position {1}", Line + 1, Offset + 1);
+            return string.Format("line {0}, character {1}", Line + 1, Offset + 1);
         }
     }
 
@@ -323,17 +342,21 @@ namespace PetaJson
         {
             _key = null;
         }
+
         public JsonAttribute(string key)
         {
             _key = key;
         }
 
+        // Key used to save this field/property
         string _key;
         public string Key
         {
             get { return _key; }
         }
 
+        // If true uses ParseInto to parse into the existing object instance
+        // If false, creates a new instance as assigns it to the property
         public bool KeepInstance
         {
             get;
@@ -526,7 +549,7 @@ namespace PetaJson
                 // Untyped dictionary?
                 if (_tokenizer.CurrentToken == Token.OpenBrace && (type.IsAssignableFrom(typeof(Dictionary<string, object>))))
                 {
-#if SIMPLEJSON_DYNAMIC
+#if PETAJSON_DYNAMIC
                     var container = (new ExpandoObject()) as IDictionary<string, object>;
 #else
                     var container = new Dictionary<string, object>();
