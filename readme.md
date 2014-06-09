@@ -219,7 +219,7 @@ the X and Y components of the Point.  The reader and writer objects passed to th
 however have methods for reading and writing any arbitrary json format - this example just 
 happens to use a string literal.
 
-## Custom factories
+## Custom Factories
 
 Suppose we have a class heirarchy something like this:
 
