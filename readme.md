@@ -437,7 +437,7 @@ The IJsonWriter interface writes to the Json output stream:
 *WriteStringLiteral* - writes a string literal to the output stream, including the surrounding quotes and
  escaping the content as required.
 
-*WriteRaw* - writes directly to the output stream.  Use for comments, or self genarated Json data.
+*WriteRaw* - writes directly to the output stream.  Use for comments, or self generated Json data.
 
 *WriteArray* - writes an array to the output stream.  The callback should write each element.
 
