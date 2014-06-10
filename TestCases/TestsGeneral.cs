@@ -187,5 +187,20 @@ namespace TestCases
 		{
 			Assert.Throws<JsonParseException>(() => Json.Parse<object>("\"\\q\""));
         }
+
+        [Test]
+        public void ErrorLocation()
+        {
+            var strJson="{\r\n \r\n \n\r \r \n \t   \"key:\": zzz";
+            try
+            {
+                Json.Parse<object>(strJson);
+            }
+            catch (JsonParseException x)
+            {
+                Assert.AreEqual(x.Position.Line, 5);
+                Assert.AreEqual(x.Position.Offset, 13);
+            }
+        }
     }
 }

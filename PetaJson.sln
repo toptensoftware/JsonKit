@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestCases", "TestCases\TestCases.csproj", "{B1C908D5-CFEE-41D7-8D5C-50D0DD697E2C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EmitDev", "EmitDev\EmitDev.csproj", "{C70C2324-5076-497A-B93F-C3C49DFDB045}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -13,6 +15,10 @@ Global
 		{B1C908D5-CFEE-41D7-8D5C-50D0DD697E2C}.Debug|x86.Build.0 = Debug|x86
 		{B1C908D5-CFEE-41D7-8D5C-50D0DD697E2C}.Release|x86.ActiveCfg = Release|x86
 		{B1C908D5-CFEE-41D7-8D5C-50D0DD697E2C}.Release|x86.Build.0 = Release|x86
+		{C70C2324-5076-497A-B93F-C3C49DFDB045}.Debug|x86.ActiveCfg = Debug|x86
+		{C70C2324-5076-497A-B93F-C3C49DFDB045}.Debug|x86.Build.0 = Debug|x86
+		{C70C2324-5076-497A-B93F-C3C49DFDB045}.Release|x86.ActiveCfg = Release|x86
+		{C70C2324-5076-497A-B93F-C3C49DFDB045}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
