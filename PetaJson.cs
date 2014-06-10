@@ -903,7 +903,41 @@ namespace PetaJson
                 _writer.Write(str);
             }
 
+            static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\0', '\\', '\'' };
+
             public void WriteStringLiteral(string str)
+            {
+                _writer.Write("\"");
+
+                int pos = 0;
+                int escapePos;
+                while ((escapePos = str.IndexOfAny(_charsToEscape, pos)) >= 0)
+                {
+                    if (escapePos > pos)
+                        _writer.Write(str.Substring(pos, escapePos - pos));
+
+                    switch (str[escapePos])
+                    {
+                        case '\"': _writer.Write("\\\""); break;
+                        case '\r': _writer.Write("\\r"); break;
+                        case '\n': _writer.Write("\\n"); break;
+                        case '\t': _writer.Write("\\t"); break;
+                        case '\0': _writer.Write("\\0"); break;
+                        case '\\': _writer.Write("\\\\"); break;
+                        case '\'': _writer.Write("\\'"); break;
+                    }
+
+                    pos = escapePos + 1;
+                }
+
+
+                if (escapePos > pos)
+                    _writer.Write(str.Substring(pos, escapePos - pos));
+                _writer.Write("\"");
+            }
+
+
+            public void WriteStringLiteralX(string str)
             {
                 _writer.Write("\"");
 
