@@ -18,6 +18,9 @@ using System.Collections;
 #if PETAJSON_DYNAMIC
 using System.Dynamic;
 #endif
+#if PETAJSON_EMIT
+using System.Reflection.Emit;
+#endif
 
 namespace PetaJson
 {
@@ -894,7 +897,18 @@ namespace PetaJson
                     throw new InvalidOperationException("Attempt to write dictionary element when not in dictionary block");
                 NextElement();
                 WriteStringLiteral(key);
-                WriteRaw(((_options & JsonOptions.WriteWhitespace)!=0) ? ": " : ":");
+                WriteRaw(((_options & JsonOptions.WriteWhitespace) != 0) ? ": " : ":");
+            }
+
+            public void WriteKeyNoEscaping(string key)
+            {
+                if (_currentBlockKind != '{')
+                    throw new InvalidOperationException("Attempt to write dictionary element when not in dictionary block");
+                NextElement();
+                WriteRaw("\"");
+                WriteRaw(key);
+                WriteRaw("\"");
+                WriteRaw(((_options & JsonOptions.WriteWhitespace) != 0) ? ": " : ":");
             }
 
             public void WriteRaw(string str)
@@ -903,7 +917,7 @@ namespace PetaJson
                 _writer.Write(str);
             }
 
-            static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\0', '\\', '\'' };
+            static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\f', '\0', '\\', '\'' };
 
             public void WriteStringLiteral(string str)
             {
@@ -922,6 +936,7 @@ namespace PetaJson
                         case '\r': _writer.Write("\\r"); break;
                         case '\n': _writer.Write("\\n"); break;
                         case '\t': _writer.Write("\\t"); break;
+                        case '\f': _writer.Write("\\f"); break;
                         case '\0': _writer.Write("\\0"); break;
                         case '\\': _writer.Write("\\\\"); break;
                         case '\'': _writer.Write("\\'"); break;
@@ -931,8 +946,8 @@ namespace PetaJson
                 }
 
 
-                if (escapePos > pos)
-                    _writer.Write(str.Substring(pos, escapePos - pos));
+                if (str.Length > pos)
+                    _writer.Write(str.Substring(pos));
                 _writer.Write("\"");
             }
 
@@ -1071,7 +1086,26 @@ namespace PetaJson
 
         class JsonMemberInfo
         {
-            public MemberInfo Member;
+            MemberInfo _mi;
+            public MemberInfo Member
+            {
+                get { return _mi; }
+                set
+                {
+                    _mi = value;
+                    if (_mi is PropertyInfo)
+                    {
+                        GetValue = CreateGetter((PropertyInfo)_mi);
+                        SetValue = CreateSetter((PropertyInfo)_mi);
+                    }
+                    else
+                    {
+                        GetValue = CreateGetter((FieldInfo)_mi);
+                        SetValue = CreateSetter((FieldInfo)_mi);
+                    }
+                }
+            }
+
             public string JsonKey;
             public bool KeepInstance;
 
@@ -1090,29 +1124,97 @@ namespace PetaJson
                 }
             }
 
-            public void SetValue(object target, object value)
+            public Action<object, object> SetValue;
+            public Func<object, object> GetValue;
+
+
+#if PETAJSON_EMIT
+            static MethodInfo fnChangeType = typeof(Convert).GetMethod("ChangeType", new Type[] { typeof(Object), typeof(Type) });
+            static MethodInfo fnGetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) });
+
+            public static Action<object, object> CreateSetter(PropertyInfo pi)
             {
-                if (Member is PropertyInfo)
-                {
-                    ((PropertyInfo)Member).SetValue(target, value, null);
-                }
-                else
-                {
-                    ((FieldInfo)Member).SetValue(target, value);
-                }
+                var m = new DynamicMethod("dynamic_property_setter_" + pi.DeclaringType.Name + "_" + pi.Name, null, new Type[] { typeof(object), typeof(object) }, true);
+                var il = m.GetILGenerator();
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(pi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, pi.DeclaringType);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldtoken, pi.PropertyType);
+                il.Emit(OpCodes.Call, fnGetTypeFromHandle);
+                il.Emit(OpCodes.Call, fnChangeType);
+                il.Emit(pi.PropertyType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, pi.PropertyType);
+
+                il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
+                il.Emit(OpCodes.Ret);
+
+                return (Action<object, object>)m.CreateDelegate(typeof(Action<object, object>));
             }
 
-            public object GetValue(object target)
+            public static Action<object, object> CreateSetter(FieldInfo fi)
             {
-                if (Member is PropertyInfo)
-                {
-                    return ((PropertyInfo)Member).GetValue(target, null);
-                }
-                else
-                {
-                    return ((FieldInfo)Member).GetValue(target);
-                }
+                var m = new DynamicMethod("dynamic_field_setter_" + fi.DeclaringType.Name + "_" + fi.Name, null, new Type[] { typeof(object), typeof(object) }, true);
+                var il = m.GetILGenerator();
+
+
+                var fnChangeType = typeof(Convert).GetMethod("ChangeType", new Type[] { typeof(Object), typeof(Type) });
+                var fnGetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) });
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(fi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, fi.DeclaringType);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldtoken, fi.FieldType);
+                il.Emit(OpCodes.Call, fnGetTypeFromHandle);
+                il.Emit(OpCodes.Call, fnChangeType);
+                il.Emit(fi.FieldType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, fi.FieldType);
+
+                il.Emit(OpCodes.Stfld, fi);
+                il.Emit(OpCodes.Ret);
+
+                return (Action<object, object>)m.CreateDelegate(typeof(Action<object, object>));
             }
+
+            public static Func<object, object> CreateGetter(PropertyInfo pi)
+            {
+                var m = new DynamicMethod("dynamic_property_setter_" + pi.DeclaringType.Name + "_" + pi.Name, typeof(object), new Type[] { typeof(object) }, true);
+                var il = m.GetILGenerator();
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(pi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, pi.DeclaringType);
+
+                il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
+
+                if (pi.PropertyType.IsValueType)
+                    il.Emit(OpCodes.Box, pi.PropertyType);
+
+                il.Emit(OpCodes.Ret);
+
+                return (Func<object, object>)m.CreateDelegate(typeof(Func<object, object>));
+            }
+            public static Func<object, object> CreateGetter(FieldInfo fi)
+            {
+                var m = new DynamicMethod("dynamic_field_setter_" + fi.DeclaringType.Name + "_" + fi.Name, typeof(object), new Type[] { typeof(object) }, true);
+                var il = m.GetILGenerator();
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(fi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, fi.DeclaringType);
+
+                il.Emit(OpCodes.Ldfld, fi);
+                if (fi.FieldType.IsValueType)
+                    il.Emit(OpCodes.Box, fi.FieldType);
+
+                il.Emit(OpCodes.Ret);
+
+                return (Func<object, object>)m.CreateDelegate(typeof(Func<object, object>));
+            }
+#else
+        public static Action<object, object> CreateSetter(PropertyInfo pi) { return (obj, val) => pi.SetValue(obj, val, null); }
+        public static Action<object, object> CreateSetter(FieldInfo fi) { return fi.SetValue; }
+        public static Func<object, object> CreateGetter(PropertyInfo pi) { return (obj) => pi.GetValue(obj, null); }
+        public static Func<object, object> CreateGetter(FieldInfo fi) { return fi.GetValue; }
+#endif
         }
 
         class ReflectionInfo
@@ -1131,7 +1233,7 @@ namespace PetaJson
 
                     foreach (var jmi in _members)
                     {
-                        w.WriteKey(jmi.JsonKey);
+                        w.WriteKeyNoEscaping(jmi.JsonKey);
                         w.WriteValue(jmi.GetValue(val));
                     }
 
@@ -1339,44 +1441,41 @@ namespace PetaJson
             public RewindableTextReader(TextReader underlying)
             {
                 _underlying = underlying;
-                ReadUnderlying();
+                FillBuffer();
             }
 
             TextReader _underlying;
-            char[] _buf = new char[1024];
+            char[] _buf = new char[4096];
             int _pos;
             int _bufUsed;
             StringBuilder _rewindBuffer;
             int _rewindBufferPos;
 
-            void ReadUnderlying()
+            void FillBuffer()
             {
                 _bufUsed = _underlying.Read(_buf, 0, _buf.Length);
                 _pos = 0;
             }
 
-            char ReadUnderlyingChar()
-            {
-                if (_pos >= _bufUsed)
-                {
-                    if (_bufUsed > 0)
-                    {
-                        ReadUnderlying();
-                    }
-                    if (_bufUsed == 0)
-                    {
-                        return '\0';
-                    }
-                }
-
-                // Next
-                return _buf[_pos++];
-            }
-
             public char ReadChar()
             {
                 if (_rewindBuffer == null)
-                    return ReadUnderlyingChar();
+                {
+                    if (_pos >= _bufUsed)
+                    {
+                        if (_bufUsed > 0)
+                        {
+                            FillBuffer();
+                        }
+                        if (_bufUsed == 0)
+                        {
+                            return '\0';
+                        }
+                    }
+
+                    // Next
+                    return _buf[_pos++];
+                }
 
                 if (_rewindBufferPos < _rewindBuffer.Length)
                 {
@@ -1384,13 +1483,15 @@ namespace PetaJson
                 }
                 else
                 {
-                    char ch = ReadUnderlyingChar();
+                    if (_pos >= _bufUsed && _bufUsed > 0)
+                        FillBuffer();
+
+                    char ch = _bufUsed == 0 ? '\0' : _buf[_pos++];
                     _rewindBuffer.Append(ch);
                     _rewindBufferPos++;
                     return ch;
                 }
             }
-
 
             Stack<int> _bookmarks = new Stack<int>();
 
@@ -1421,6 +1522,7 @@ namespace PetaJson
             }
         }
 
+ 
         public class Tokenizer
         {
             public Tokenizer(TextReader r, JsonOptions options)
@@ -1428,9 +1530,9 @@ namespace PetaJson
                 _reader = new RewindableTextReader(r);
                 _options = options;
 
-                _state._nextCharPos.Line = 0;
-                _state._nextCharPos.Offset = 0;
-                _state._currentCharPos = _state._nextCharPos;
+                _nextCharPos.Line = 0;
+                _nextCharPos.Offset = 0;
+                _currentCharPos = _nextCharPos;
 
                 // Load up
                 NextChar();
@@ -1440,19 +1542,51 @@ namespace PetaJson
             RewindableTextReader _reader;
             JsonOptions _options;
             StringBuilder _sb = new StringBuilder();
-            ReaderState _state;
+
+            JsonLineOffset _nextCharPos;
+            JsonLineOffset _currentCharPos;
+            JsonLineOffset CurrentTokenPos;
+            char _currentChar;
+            char _pendingChar;
+            public Token CurrentToken;
+            public string String;
+            public object Literal;
 
             // this object represents the entire state of the reader
             // which when combined with the RewindableTextReader allows
             // use to rewind to an arbitrary point in the token stream
             struct ReaderState
             {
+                public ReaderState(Tokenizer tokenizer)
+                {
+                    _nextCharPos = tokenizer._nextCharPos;
+                    _currentCharPos = tokenizer._currentCharPos;
+                    CurrentTokenPos = tokenizer.CurrentTokenPos;
+                    _currentChar = tokenizer._currentChar;
+                    _pendingChar = tokenizer._pendingChar;
+                    CurrentToken = tokenizer.CurrentToken;
+                    _string = tokenizer.String;
+                    _literal = tokenizer.Literal;
+                }
+
+                public void Apply(Tokenizer tokenizer)
+                {
+                    tokenizer._nextCharPos = _nextCharPos;
+                    tokenizer._currentCharPos = _currentCharPos;
+                    tokenizer.CurrentTokenPos = CurrentTokenPos;
+                    tokenizer._currentChar = _currentChar;
+                    tokenizer._pendingChar = _pendingChar;
+                    tokenizer.CurrentToken = CurrentToken;
+                    tokenizer.String = _string;
+                    tokenizer.Literal = _literal;
+                }
+
                 public JsonLineOffset _nextCharPos;
                 public JsonLineOffset _currentCharPos;
-                public JsonLineOffset _currentTokenPos;
+                public JsonLineOffset CurrentTokenPos;
                 public char _currentChar;
                 public char _pendingChar;
-                public Token _currentToken;
+                public Token CurrentToken;
                 public string _string;
                 public object _literal;
             }
@@ -1461,7 +1595,7 @@ namespace PetaJson
 
             public void CreateBookmark()
             {
-                _bookmarks.Push(_state);
+                _bookmarks.Push(new ReaderState(this));
                 _reader.CreateBookmark();
             }
 
@@ -1473,7 +1607,7 @@ namespace PetaJson
 
             public void RewindToBookmark()
             {
-                _state = _bookmarks.Pop();
+                _bookmarks.Pop().Apply(this);
                 _reader.RewindToBookmark();
             }
 
@@ -1481,9 +1615,9 @@ namespace PetaJson
             {
                 // Normalize line endings to '\n'
                 char ch;
-                if (_state._pendingChar != '\0')
+                if (_pendingChar != '\0')
                 {
-                    ch = _state._pendingChar;
+                    ch = _pendingChar;
                 }
                 else
                 {
@@ -1493,26 +1627,26 @@ namespace PetaJson
                         ch = _reader.ReadChar();
                         if (ch != '\n')
                         {
-                            _state._pendingChar = ch;
+                            _pendingChar = ch;
                             ch = '\n';
                         }
                     }
                 }
 
-                _state._currentCharPos = _state._nextCharPos;
+                _currentCharPos = _nextCharPos;
 
                 // Update line position counter
                 if (ch == '\n')
                 {
-                    _state._nextCharPos.Line++;
-                    _state._nextCharPos.Offset = 0;
+                    _nextCharPos.Line++;
+                    _nextCharPos.Offset = 0;
                 }
                 else
                 {
-                    _state._nextCharPos.Offset++;
+                    _nextCharPos.Offset++;
                 }
 
-                return _state._currentChar = ch;
+                return _currentChar = ch;
             }
 
             public bool DidMove
@@ -1525,193 +1659,169 @@ namespace PetaJson
             {
                 DidMove = true;
 
-                _sb.Length = 0;
-                State state = State.Initial;
-
-                _state._currentTokenPos = _state._currentCharPos;
 
                 while (true)
                 {
-                    switch (state)
+                    while (_currentChar == '\t' || _currentChar == ' ' || _currentChar == '\r' || _currentChar == '\n')
                     {
-                        case State.Initial:
-                            if (IsIdentifierLeadChar(_state._currentChar))
-                            {
-                                state = State.Identifier;
-                                break;
-                            }
-                            else if (char.IsDigit(_state._currentChar) || _state._currentChar == '-')
-                            {
-                                TokenizeNumber();
-                                _state._currentToken =  Token.Literal;
-                                return;
-                            }
-                            else if (char.IsWhiteSpace(_state._currentChar))
-                            {
-                                NextChar();
-                                _state._currentTokenPos = _state._currentCharPos;
-                                break;
-                            }
+                        NextChar();
+                    }
 
-                            switch (_state._currentChar)
-                            {
-                                case '/':
-                                    if ((_options & JsonOptions.StrictParser)!=0)
-                                    {
-                                        // Comments not support in strict mode
-                                        throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _state._currentChar));
-                                    }
-                                    else
-                                    {
-                                        NextChar();
-                                        state = State.Slash;
-                                    }
-                                    break;
+                    CurrentTokenPos = _currentCharPos;
 
-                                case '\"':
-                                    NextChar();
-                                    _sb.Length = 0;
-                                    state = State.QuotedString;
-                                    break;
-
-                                case '\'':
-                                    NextChar();
-                                    _sb.Length = 0;
-                                    state = State.QuotedChar;
-                                    break;
-
-                                case '\0':
-                                    _state._currentToken =  Token.EOF;
-                                    return;
-
-                                case '{': _state._currentToken =  Token.OpenBrace; NextChar(); return;
-                                case '}': _state._currentToken =  Token.CloseBrace; NextChar(); return;
-                                case '[': _state._currentToken =  Token.OpenSquare; NextChar(); return;
-                                case ']': _state._currentToken =  Token.CloseSquare; NextChar(); return;
-                                case '=': _state._currentToken =  Token.Equal; NextChar(); return;
-                                case ':': _state._currentToken =  Token.Colon; NextChar(); return;
-                                case ';': _state._currentToken =  Token.SemiColon; NextChar(); return;
-                                case ',': _state._currentToken =  Token.Comma; NextChar(); return;
-
-                                default:
-                                    throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _state._currentChar));
-                            }
-                            break;
-
-                        case State.Slash:
-                            switch (_state._currentChar)
-                            {
-                                case '/':
-                                    NextChar();
-                                    state = State.SingleLineComment;
-                                    break;
-
-                                case '*':
-                                    NextChar();
-                                    state = State.BlockComment;
-                                    break;
-
-                                default:
-                                    throw new InvalidDataException("syntax error - unexpected character after slash");
-                            }
-                            break;
-
-
-                        case State.SingleLineComment:
-                            if (_state._currentChar == '\r' || _state._currentChar == '\n')
-                            {
-                                state = State.Initial;
-                            }
+                    if (IsIdentifierLeadChar(_currentChar))
+                    {
+                        _sb.Length = 0;
+                        while (IsIdentifierChar(_currentChar))
+                        {
+                            _sb.Append(_currentChar);
                             NextChar();
-                            break;
+                        }
 
-                        case State.BlockComment:
-                            if (_state._currentChar == '*')
-                            {
-                                NextChar();
-                                if (_state._currentChar == '/')
-                                {
-                                    state = State.Initial;
-                                }
-                            }
-                            NextChar();
-                            break;
+                        String = _sb.ToString();
+                        switch (String)
+                        {
+                            case "true":
+                                Literal = true;
+                                CurrentToken =  Token.Literal;
+                                break;
 
-                        case State.Identifier:
-                            if (IsIdentifierChar(_state._currentChar))
+                            case "false":
+                                Literal = false;
+                                CurrentToken =  Token.Literal;
+                                break;
+
+                            case "null":
+                                Literal = null;
+                                CurrentToken =  Token.Literal;
+                                break;
+
+                            default:
+                                CurrentToken =  Token.Identifier;
+                                break;
+                        }
+                        return;
+                    }
+
+                    if (char.IsDigit(_currentChar) || _currentChar == '-')
+                    {
+                        TokenizeNumber();
+                        CurrentToken =  Token.Literal;
+                        return;
+                    }
+
+
+                    switch (_currentChar)
+                    {
+                        case '/':
+                            if ((_options & JsonOptions.StrictParser)!=0)
                             {
-                                _sb.Append(_state._currentChar);
-                                NextChar();
+                                // Comments not support in strict mode
+                                throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
                             }
                             else
                             {
-                                _state._string = _sb.ToString();
-                                switch (this.String)
+                                NextChar();
+                                switch (_currentChar)
                                 {
-                                    case "true":
-                                        _state._literal = true;
-                                        _state._currentToken =  Token.Literal;
+                                    case '/':
+                                        NextChar();
+                                        while (_currentChar!='\0' && _currentChar != '\r' && _currentChar != '\n')
+                                        {
+                                            NextChar();
+                                        }
                                         break;
 
-                                    case "false":
-                                        _state._literal = false;
-                                        _state._currentToken =  Token.Literal;
-                                        break;
-
-                                    case "null":
-                                        _state._literal = null;
-                                        _state._currentToken =  Token.Literal;
+                                    case '*':
+                                        bool endFound = false;
+                                        while (!endFound && _currentChar!='\0')
+                                        {
+                                            if (_currentChar == '*')
+                                            {
+                                                NextChar();
+                                                if (_currentChar == '/')
+                                                {
+                                                    endFound = true;
+                                                }
+                                            }
+                                            NextChar();
+                                        }
                                         break;
 
                                     default:
-                                        _state._currentToken =  Token.Identifier;
-                                        break;
+                                        throw new InvalidDataException("syntax error - unexpected character after slash");
                                 }
-                                return;
                             }
                             break;
 
-                        case State.QuotedString:
-                            if (_state._currentChar == '\\')
+                        case '\"':
+                        case '\'':
+                        {
+                            _sb.Length = 0;
+                            var quoteKind = _currentChar;
+                            NextChar();
+                            while (_currentChar!='\0')
                             {
-                                AppendSpecialChar();
-                            }
-                            else if (_state._currentChar == '\"')
-                            {
-                                _state._literal = _sb.ToString();
-                                _state._currentToken =  Token.Literal;
-                                NextChar();
-                                return;
-                            }
-                            else
-                            {
-                                _sb.Append(_state._currentChar);
-                                NextChar();
-                                continue;
-                            }
+                                if (_currentChar == '\\')
+                                {
+                                    NextChar();
+                                    var escape = _currentChar;
+                                    switch (escape)
+                                    {
+                                        case '\'': _sb.Append('\''); break;
+                                        case '\"': _sb.Append('\"'); break;
+                                        case '\\': _sb.Append('\\'); break;
+                                        case 'r': _sb.Append('\r'); break;
+                                        case 'f': _sb.Append('\f'); break;
+                                        case 'n': _sb.Append('\n'); break;
+                                        case 't': _sb.Append('\t'); break;
+                                        case '0': _sb.Append('\0'); break;
+                                        case 'u':
+                                            var sbHex = new StringBuilder();
+                                            for (int i = 0; i < 4; i++)
+                                            {
+                                                NextChar();
+                                                sbHex.Append(_currentChar);
+                                            }
+                                            _sb.Append((char)Convert.ToUInt16(sbHex.ToString(), 16));
+                                            break;
 
-                            break;
+                                        default:
+                                            throw new InvalidDataException(string.Format("Invalid escape sequence in string literal: '\\{0}'", _currentChar));
+                                    }
+                                }
+                                else if (_currentChar == quoteKind)
+                                {
+                                    Literal = _sb.ToString();
+                                    CurrentToken =  Token.Literal;
+                                    NextChar();
+                                    return;
+                                }
+                                else
+                                {
+                                    _sb.Append(_currentChar);
+                                }
 
-                        case State.QuotedChar:
-                            if (_state._currentChar == '\\')
-                            {
-                                AppendSpecialChar();
+                                NextChar();
                             }
-                            else if (_state._currentChar == '\'')
-                            {
-                                _state._literal = _sb.ToString();
+                            throw new InvalidDataException("syntax error - unterminated string literal");
+                        }
 
-                                _state._currentToken =  Token.Literal;
-                                NextChar();
-                                return;
-                            }
-                            else
-                            {
-                                _sb.Append(_state._currentChar);
-                                NextChar();
-                                continue;
-                            }
-                            break;
+                        case '\0':
+                            CurrentToken =  Token.EOF;
+                            return;
+
+                        case '{': CurrentToken =  Token.OpenBrace; NextChar(); return;
+                        case '}': CurrentToken =  Token.CloseBrace; NextChar(); return;
+                        case '[': CurrentToken =  Token.OpenSquare; NextChar(); return;
+                        case ']': CurrentToken =  Token.CloseSquare; NextChar(); return;
+                        case '=': CurrentToken =  Token.Equal; NextChar(); return;
+                        case ':': CurrentToken =  Token.Colon; NextChar(); return;
+                        case ';': CurrentToken =  Token.SemiColon; NextChar(); return;
+                        case ',': CurrentToken =  Token.Comma; NextChar(); return;
+
+                        default:
+                            throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
                     }
                 }
             }
@@ -1722,12 +1832,12 @@ namespace PetaJson
 
                 // Leading -
                 bool signed = false;
-                if (_state._currentChar == '-')
+                if (_currentChar == '-')
                 {
                     signed = true;
-                    _sb.Append(_state._currentChar);
+                    _sb.Append(_currentChar);
                     NextChar();
-                    if (!Char.IsDigit(_state._currentChar))
+                    if (!Char.IsDigit(_currentChar))
                     {
                         throw new InvalidDataException("syntax error - expected digit to follow negative sign");
                     }
@@ -1735,38 +1845,50 @@ namespace PetaJson
 
                 // Parse all digits
                 bool fp = false;
-                while (char.IsDigit(_state._currentChar) || _state._currentChar == '.' || _state._currentChar == 'e' || _state._currentChar == 'E' || _state._currentChar == 'x' || _state._currentChar == 'X')
+                while (char.IsDigit(_currentChar) || _currentChar == '.' || _currentChar == 'e' || _currentChar == 'E' || _currentChar == 'x' || _currentChar == 'X')
                 {
-                    if (_state._currentChar == 'e' || _state._currentChar == 'E')
+                    if (_currentChar == 'e' || _currentChar == 'E')
                     {
                         fp = true;
-                        _sb.Append(_state._currentChar);
+                        _sb.Append(_currentChar);
 
                         NextChar();
-                        if (_state._currentChar == '-' || _state._currentChar == '+')
+                        if (_currentChar == '-' || _currentChar == '+')
                         {
-                            _sb.Append(_state._currentChar);
+                            _sb.Append(_currentChar);
                             NextChar();
                         }
                     }
                     else
                     {
-                        if (_state._currentChar == '.')
+                        if (_currentChar == '.')
                             fp = true;
 
-                        _sb.Append(_state._currentChar);
+                        _sb.Append(_currentChar);
                         NextChar();
                     }
                 }
 
                 Type type = fp ? typeof(double) : (signed ? typeof(long) : typeof(ulong));
-                if (char.IsLetterOrDigit(_state._currentChar))
-                    throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _state._currentChar));
+                if (char.IsLetterOrDigit(_currentChar))
+                    throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _currentChar));
+
 
                 // Convert type
                 try
                 {
-                    _state._literal = Convert.ChangeType(_sb.ToString(), type, System.Globalization.CultureInfo.InvariantCulture);
+                    if (fp)
+                    {
+                        Literal = double.Parse(_sb.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else if (signed)
+                    {
+                        Literal = long.Parse(_sb.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        Literal = ulong.Parse(_sb.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+                    }
                 }
                 catch
                 {
@@ -1801,64 +1923,9 @@ namespace PetaJson
             }
 
 
-            void AppendSpecialChar()
-            {
-                NextChar();
-                var escape = _state._currentChar;
-                NextChar();
-                switch (escape)
-                {
-                    case '\'': _sb.Append('\''); break;
-                    case '\"': _sb.Append('\"'); break;
-                    case '\\': _sb.Append('\\'); break;
-                    case 'r': _sb.Append('\r'); break;
-                    case 'n': _sb.Append('\n'); break;
-                    case 't': _sb.Append('\t'); break;
-                    case '0': _sb.Append('\0'); break;
-                    case 'u':
-						var sbHex = new StringBuilder();
-						for (int i = 0; i < 4; i++)
-						{
-							sbHex.Append(_state._currentChar);
-							NextChar();
-						}
-						_sb.Append((char)Convert.ToUInt16(sbHex.ToString(), 16));
-                        break;
-
-                    default:
-                        throw new InvalidDataException(string.Format("Invalid escape sequence in string literal: '\\{0}'", _state._currentChar));
-                }
-            }
-
-            public Token CurrentToken
-            {
-                get { return _state._currentToken; }
-            }
-
             public JsonLineOffset CurrentTokenPosition
             {
-                get { return _state._currentTokenPos; }
-            }
-
-            public string String
-            {
-                get { return _state._string; }
-            }
-
-            public object Literal
-            {
-                get { return _state._literal; }
-            }
-
-            private enum State
-            {
-                Initial,
-                Slash,
-                SingleLineComment,
-                BlockComment,
-                Identifier,
-                QuotedString,
-                QuotedChar,
+                get { return CurrentTokenPos; }
             }
 
             public static bool IsIdentifierChar(char ch)
