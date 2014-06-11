@@ -309,31 +309,29 @@ namespace PetaJson
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Castclass, type);
 
-                    if (m.MemberType == typeof(string))
+                    Action<string> callHelper = helperName =>
                     {
                         // check we have a string
                         il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralString", new Type[] { typeof(IJsonReader) }));
+                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod(helperName, new Type[] { typeof(IJsonReader) }));
 
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                    };
+
+                    if (m.MemberType == typeof(string))
+                    {
+                        callHelper("GetLiteralString");
                     }
 
                     else if (m.MemberType == typeof(bool))
                     {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralBool", new Type[] { typeof(IJsonReader) }));
-
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                        callHelper("GetLiteralBool");
                     }
 
                     else if (m.MemberType == typeof(char))
                     {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralChar", new Type[] { typeof(IJsonReader) }));
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                        callHelper("GetLiteralChar");
                     }
 
                     else if (numericTypes.Contains(m.MemberType))
@@ -368,19 +366,6 @@ namespace PetaJson
                     {
                         il.Emit(OpCodes.Stfld, fi);
                     }
-
-                    // Cast/unbox the target object and store in local variable
-                    /*
-                    var locTypedObj = il.DeclareLocal(type);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
-                    il.Emit(OpCodes.Stloc, locTypedObj);
-
-                    // Get Invariant CultureInfo
-                    var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
-                    il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
-                    il.Emit(OpCodes.Stloc, locInvariant);
-                        */
 
                     il.Emit(OpCodes.Ret);
 
@@ -456,87 +441,4 @@ namespace PetaJson
 
         }
     }
-
-    /*
-            static MethodInfo fnChangeType = typeof(Convert).GetMethod("ChangeType", new Type[] { typeof(Object), typeof(Type) });
-            static MethodInfo fnGetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) });
-
-            public static Action<object, object> CreateSetter(PropertyInfo pi)
-            {
-                var m = new DynamicMethod("dynamic_property_setter_" + pi.DeclaringType.Name + "_" + pi.Name, null, new Type[] { typeof(object), typeof(object) }, true);
-                var il = m.GetILGenerator();
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(pi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, pi.DeclaringType);
-
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldtoken, pi.PropertyType);
-                il.Emit(OpCodes.Call, fnGetTypeFromHandle);
-                il.Emit(OpCodes.Call, fnChangeType);
-                il.Emit(pi.PropertyType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, pi.PropertyType);
-
-                il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
-                il.Emit(OpCodes.Ret);
-
-                return (Action<object, object>)m.CreateDelegate(typeof(Action<object, object>));
-            }
-
-            public static Action<object, object> CreateSetter(FieldInfo fi)
-            {
-                var m = new DynamicMethod("dynamic_field_setter_" + fi.DeclaringType.Name + "_" + fi.Name, null, new Type[] { typeof(object), typeof(object) }, true);
-                var il = m.GetILGenerator();
-
-
-                var fnChangeType = typeof(Convert).GetMethod("ChangeType", new Type[] { typeof(Object), typeof(Type) });
-                var fnGetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) });
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(fi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, fi.DeclaringType);
-
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldtoken, fi.FieldType);
-                il.Emit(OpCodes.Call, fnGetTypeFromHandle);
-                il.Emit(OpCodes.Call, fnChangeType);
-                il.Emit(fi.FieldType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, fi.FieldType);
-
-                il.Emit(OpCodes.Stfld, fi);
-                il.Emit(OpCodes.Ret);
-
-                return (Action<object, object>)m.CreateDelegate(typeof(Action<object, object>));
-            }
-
-            public static Func<object, object> CreateGetter(PropertyInfo pi)
-            {
-                var m = new DynamicMethod("dynamic_property_setter_" + pi.DeclaringType.Name + "_" + pi.Name, typeof(object), new Type[] { typeof(object) }, true);
-                var il = m.GetILGenerator();
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(pi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, pi.DeclaringType);
-
-                il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
-
-                if (pi.PropertyType.IsValueType)
-                    il.Emit(OpCodes.Box, pi.PropertyType);
-
-                il.Emit(OpCodes.Ret);
-
-                return (Func<object, object>)m.CreateDelegate(typeof(Func<object, object>));
-            }
-            public static Func<object, object> CreateGetter(FieldInfo fi)
-            {
-                var m = new DynamicMethod("dynamic_field_setter_" + fi.DeclaringType.Name + "_" + fi.Name, typeof(object), new Type[] { typeof(object) }, true);
-                var il = m.GetILGenerator();
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(fi.DeclaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, fi.DeclaringType);
-
-                il.Emit(OpCodes.Ldfld, fi);
-                if (fi.FieldType.IsValueType)
-                    il.Emit(OpCodes.Box, fi.FieldType);
-
-                il.Emit(OpCodes.Ret);
-
-                return (Func<object, object>)m.CreateDelegate(typeof(Func<object, object>));
-            }
-     */
 }

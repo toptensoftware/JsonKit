@@ -1413,98 +1413,13 @@ namespace PetaJson
 
         }
 
-        public class RewindableTextReader
-        {
-            public RewindableTextReader(TextReader underlying)
-            {
-                _underlying = underlying;
-                FillBuffer();
-            }
-
-            TextReader _underlying;
-            char[] _buf = new char[4096];
-            int _pos;
-            int _bufUsed;
-            StringBuilder _rewindBuffer;
-            int _rewindBufferPos;
-
-            void FillBuffer()
-            {
-                _bufUsed = _underlying.Read(_buf, 0, _buf.Length);
-                _pos = 0;
-            }
-
-            public char ReadChar()
-            {
-                if (_rewindBuffer == null)
-                {
-                    if (_pos >= _bufUsed)
-                    {
-                        if (_bufUsed > 0)
-                        {
-                            FillBuffer();
-                        }
-                        if (_bufUsed == 0)
-                        {
-                            return '\0';
-                        }
-                    }
-
-                    // Next
-                    return _buf[_pos++];
-                }
-
-                if (_rewindBufferPos < _rewindBuffer.Length)
-                {
-                    return _rewindBuffer[_rewindBufferPos++];
-                }
-                else
-                {
-                    if (_pos >= _bufUsed && _bufUsed > 0)
-                        FillBuffer();
-
-                    char ch = _bufUsed == 0 ? '\0' : _buf[_pos++];
-                    _rewindBuffer.Append(ch);
-                    _rewindBufferPos++;
-                    return ch;
-                }
-            }
-
-            Stack<int> _bookmarks = new Stack<int>();
-
-            public void CreateBookmark()
-            {
-                if (_rewindBuffer == null)
-                {
-                    _rewindBuffer = new StringBuilder();
-                    _rewindBufferPos = 0;
-                }
-
-                _bookmarks.Push(_rewindBufferPos);
-            }
-
-            public void RewindToBookmark()
-            {
-                _rewindBufferPos = _bookmarks.Pop();
-            }
-
-            public void DiscardBookmark()
-            {
-                _bookmarks.Pop();
-                if (_bookmarks.Count == 0)
-                {
-                    _rewindBuffer = null;
-                    _rewindBufferPos = 0;
-                }
-            }
-        }
-
- 
         public class Tokenizer
         {
             public Tokenizer(TextReader r, JsonOptions options)
             {
-                _reader = new RewindableTextReader(r);
+                _underlying = r;
+                FillBuffer();
+
                 _options = options;
 
                 // Load up
@@ -1512,9 +1427,15 @@ namespace PetaJson
                 NextToken();
             }
 
-            RewindableTextReader _reader;
             JsonOptions _options;
             StringBuilder _sb = new StringBuilder();
+
+            TextReader _underlying;
+            char[] _buf = new char[4096];
+            int _pos;
+            int _bufUsed;
+            StringBuilder _rewindBuffer;
+            int _rewindBufferPos;
 
             JsonLineOffset _currentCharPos;
             JsonLineOffset CurrentTokenPos;
@@ -1579,6 +1500,7 @@ namespace PetaJson
                     CurrentToken = tokenizer.CurrentToken;
                     _string = tokenizer.String;
                     _literalKind = tokenizer.LiteralKind;
+                    _rewindBufferPos = tokenizer._rewindBufferPos;
                 }
 
                 public void Apply(Tokenizer tokenizer)
@@ -1590,6 +1512,7 @@ namespace PetaJson
                     tokenizer.CurrentToken = CurrentToken;
                     tokenizer.String = _string;
                     tokenizer.LiteralKind = _literalKind;
+                    tokenizer._rewindBufferPos = _rewindBufferPos;
                 }
 
                 public JsonLineOffset _currentCharPos;
@@ -1599,6 +1522,7 @@ namespace PetaJson
                 public Token CurrentToken;
                 public LiteralKind _literalKind;
                 public string _string;
+                public int _rewindBufferPos;
             }
 
             Stack<ReaderState> _bookmarks = new Stack<ReaderState>();
@@ -1606,25 +1530,71 @@ namespace PetaJson
             public void CreateBookmark()
             {
                 _bookmarks.Push(new ReaderState(this));
-                _reader.CreateBookmark();
+                if (_rewindBuffer == null)
+                {
+                    _rewindBuffer = new StringBuilder();
+                    _rewindBufferPos = 0;
+                }
             }
 
             public void DiscardBookmark()
             {
                 _bookmarks.Pop();
-                _reader.DiscardBookmark();
+                if (_bookmarks.Count == 0)
+                {
+                    _rewindBuffer = null;
+                    _rewindBufferPos = 0;
+                }
             }
 
             public void RewindToBookmark()
             {
                 _bookmarks.Pop().Apply(this);
-                _reader.RewindToBookmark();
             }
 
-            char NextChar()
+            void FillBuffer()
             {
-                _currentCharPos.Offset++;
-                return _currentChar = _reader.ReadChar();
+                _bufUsed = _underlying.Read(_buf, 0, _buf.Length);
+                _pos = 0;
+            }
+
+            public char NextChar()
+            {
+                if (_rewindBuffer == null)
+                {
+                    if (_pos >= _bufUsed)
+                    {
+                        if (_bufUsed > 0)
+                        {
+                            FillBuffer();
+                        }
+                        if (_bufUsed == 0)
+                        {
+                            return _currentChar = '\0';
+                        }
+                    }
+
+                    // Next
+                    _currentCharPos.Offset++;
+                    return _currentChar = _buf[_pos++];
+                }
+
+                if (_rewindBufferPos < _rewindBuffer.Length)
+                {
+                    _currentCharPos.Offset++;
+                    return _currentChar = _rewindBuffer[_rewindBufferPos++];
+                }
+                else
+                {
+                    if (_pos >= _bufUsed && _bufUsed > 0)
+                        FillBuffer();
+
+                    _currentChar = _bufUsed == 0 ? '\0' : _buf[_pos++];
+                    _rewindBuffer.Append(_currentChar);
+                    _rewindBufferPos++;
+                    _currentCharPos.Offset++;
+                    return _currentChar;
+                }
             }
 
             public void NextToken()
