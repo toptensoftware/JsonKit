@@ -286,113 +286,106 @@ namespace PetaJson
                     typeof(double), typeof(float)
                 };
 
-                try
+                // Process all members
+                foreach (var m in ri.Members)
                 {
-                    // Process all members
-                    foreach (var m in ri.Members)
+                    // Ignore write only properties
+                    var pi = m.Member as PropertyInfo;
+                    if (pi != null && pi.GetSetMethod() == null)
                     {
-                        // Ignore write only properties
-                        var pi = m.Member as PropertyInfo;
-                        if (pi != null && pi.GetSetMethod() == null)
-                        {
-                            continue;
-                        }
-
-                        // Create a dynamic method that can do the work
-                        var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
-                        var il = method.GetILGenerator();
-
-                        if (m.KeepInstance)
-                        {
-                            throw new NotImplementedException("Emit KeepInstance not implemented");
-                        }
-
-                        // Load the target
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Castclass, type);
-
-                        if (m.MemberType == typeof(string))
-                        {
-                            // check we have a string
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralString", new Type[] { typeof(IJsonReader) }));
-
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                        }
-
-                        else if (m.MemberType == typeof(bool))
-                        {
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralBool", new Type[] { typeof(IJsonReader) }));
-
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                        }
-
-                        else if (m.MemberType == typeof(char))
-                        {
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralChar", new Type[] { typeof(IJsonReader) }));
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                        }
-
-                        else if (numericTypes.Contains(m.MemberType))
-                        {
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralNumber", new Type[] { typeof(IJsonReader) }));
-
-                            // Convert to a string
-                            il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
-                            il.Emit(OpCodes.Call, m.MemberType.GetMethod("Parse", new Type[] { typeof(string), typeof(IFormatProvider) }));
-
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                        }
-
-                        else
-                        {
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Ldtoken, m.MemberType);
-                            il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) }));
-                            il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("Parse", new Type[] { typeof(Type) }));
-                            il.Emit(m.MemberType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, m.MemberType);
-                        }
-
-                        if (pi != null)
-                        {
-                            il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
-                        }
-
-                        var fi = m.Member as FieldInfo;
-                        if (fi != null)
-                        {
-                            il.Emit(OpCodes.Stfld, fi);
-                        }
-
-                        // Cast/unbox the target object and store in local variable
-                        /*
-                        var locTypedObj = il.DeclareLocal(type);
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
-                        il.Emit(OpCodes.Stloc, locTypedObj);
-
-                        // Get Invariant CultureInfo
-                        var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
-                        il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
-                        il.Emit(OpCodes.Stloc, locInvariant);
-                         */
-
-                        il.Emit(OpCodes.Ret);
-
-                        // Store the handler in map
-                        setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
+                        continue;
                     }
-                }
-                catch (Exception x)
-                {
-                    int y = 3;
+
+                    // Create a dynamic method that can do the work
+                    var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
+                    var il = method.GetILGenerator();
+
+                    if (m.KeepInstance)
+                    {
+                        throw new NotImplementedException("Emit KeepInstance not implemented");
+                    }
+
+                    // Load the target
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Castclass, type);
+
+                    if (m.MemberType == typeof(string))
+                    {
+                        // check we have a string
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralString", new Type[] { typeof(IJsonReader) }));
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                    }
+
+                    else if (m.MemberType == typeof(bool))
+                    {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralBool", new Type[] { typeof(IJsonReader) }));
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                    }
+
+                    else if (m.MemberType == typeof(char))
+                    {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralChar", new Type[] { typeof(IJsonReader) }));
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                    }
+
+                    else if (numericTypes.Contains(m.MemberType))
+                    {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralNumber", new Type[] { typeof(IJsonReader) }));
+
+                        // Convert to a string
+                        il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
+                        il.Emit(OpCodes.Call, m.MemberType.GetMethod("Parse", new Type[] { typeof(string), typeof(IFormatProvider) }));
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                    }
+
+                    else
+                    {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldtoken, m.MemberType);
+                        il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) }));
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("Parse", new Type[] { typeof(Type) }));
+                        il.Emit(m.MemberType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, m.MemberType);
+                    }
+
+                    if (pi != null)
+                    {
+                        il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
+                    }
+
+                    var fi = m.Member as FieldInfo;
+                    if (fi != null)
+                    {
+                        il.Emit(OpCodes.Stfld, fi);
+                    }
+
+                    // Cast/unbox the target object and store in local variable
+                    /*
+                    var locTypedObj = il.DeclareLocal(type);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
+                    il.Emit(OpCodes.Stloc, locTypedObj);
+
+                    // Get Invariant CultureInfo
+                    var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
+                    il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
+                    il.Emit(OpCodes.Stloc, locInvariant);
+                        */
+
+                    il.Emit(OpCodes.Ret);
+
+                    // Store the handler in map
+                    setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
                 }
 
 

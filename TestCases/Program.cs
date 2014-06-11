@@ -16,7 +16,7 @@ namespace TestCases
 
             var str = p.field.ToString();
 
-            PetaJson.JsonEmit.Init();
+            //PetaJson.JsonEmit.Init();
             PetaTest.Runner.RunMain(args);
         }
     }

@@ -1834,41 +1834,96 @@ namespace PetaJson
                     signed = true;
                     _sb.Append(_currentChar);
                     NextChar();
-                    if (!Char.IsDigit(_currentChar))
+                }
+
+                bool hex = false;
+                if (_currentChar == '0')
+                {
+                    _sb.Append(_currentChar);
+                    NextChar();
+                    if (_currentChar == 'x' || _currentChar == 'X')
                     {
-                        throw new InvalidDataException("syntax error - expected digit to follow negative sign");
+                        _sb.Append(_currentChar);
+                        NextChar();
+                        hex = true;
                     }
                 }
 
-                // Parse all digits
+                bool cont = true;
                 bool fp = false;
-                while (char.IsDigit(_currentChar) || _currentChar == '.' || _currentChar == 'e' || _currentChar == 'E' || _currentChar == 'x' || _currentChar == 'X')
+                while (cont)
                 {
-                    if (_currentChar == 'e' || _currentChar == 'E')
+                    switch (_currentChar)
                     {
-                        fp = true;
-                        _sb.Append(_currentChar);
-
-                        NextChar();
-                        if (_currentChar == '-' || _currentChar == '+')
-                        {
+                        case '0':
+                        case '1':
+                        case '2':
+                        case '3':
+                        case '4':
+                        case '5':
+                        case '6':
+                        case '7':
+                        case '8':
+                        case '9':
                             _sb.Append(_currentChar);
                             NextChar();
-                        }
-                    }
-                    else
-                    {
-                        if (_currentChar == '.')
-                            fp = true;
+                            break;
 
-                        _sb.Append(_currentChar);
-                        NextChar();
+                        case 'A':
+                        case 'a':
+                        case 'B':
+                        case 'b':
+                        case 'C':
+                        case 'c':
+                        case 'D':
+                        case 'd':
+                        case 'F':
+                        case 'f':
+                            if (!hex)
+                                cont = false;
+                            else
+                            {
+                                _sb.Append(_currentChar);
+                                NextChar();
+                            }
+                            break;
+
+                        case '.':
+                            if (hex)
+                            {
+                                cont = false;
+                            }
+                            else
+                            {
+                                fp = true;
+                                _sb.Append(_currentChar);
+                                NextChar();
+                            }
+                            break;
+
+                        case 'E':
+                        case 'e':
+                            if (!hex)
+                            {
+                                fp = true;
+                                _sb.Append(_currentChar);
+                                NextChar();
+                                if (_currentChar == '+' || _currentChar == '-')
+                                {
+                                    _sb.Append(_currentChar);
+                                    NextChar();
+                                }
+                            }
+                            break;
+
+                        default:
+                            cont = false;
+                            break;
                     }
                 }
 
-                Type type = fp ? typeof(double) : (signed ? typeof(long) : typeof(ulong));
-                if (char.IsLetterOrDigit(_currentChar))
-                    throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _currentChar));
+                 if (char.IsLetterOrDigit(_currentChar))
+                    throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _sb.ToString()));
 
 
                 String = _sb.ToString();
@@ -1885,13 +1940,7 @@ namespace PetaJson
                 {
                     LiteralKind = LiteralKind.UnsignedInteger;
                 }
-                /*
-                }
-                catch
-                {
-                    throw new InvalidDataException(string.Format("syntax error - incorrectly formatted number '{0}'", _sb.ToString()));
-                }
-                 */
+              
 
             }
 
