@@ -276,6 +276,7 @@ namespace PetaJson
                 if (ri == null)
                     return null;
 
+                // We'll create setters for each property/field
                 var setters = new Dictionary<string, Action<IJsonReader, object>>();
 
                 // These types we'll call <type>.Parse(reader.String) on
@@ -373,12 +374,20 @@ namespace PetaJson
                     setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
                 }
 
-
-                return (reader, obj) =>
+                // Now create the parseInto delegate
+                bool hasLoading = typeof(IJsonLoading).IsAssignableFrom(type);
+                bool hasLoaded = typeof(IJsonLoaded).IsAssignableFrom(type);
+                Action<IJsonReader, object> parseInto = (reader, obj) =>
                 {
+                    if (hasLoading)
+                    {
+                        ((IJsonLoading)obj).OnJsonLoading(reader);
+                    }
+
+                    var lf = obj as IJsonLoadField;
+
                     reader.ReadDictionary(key =>
                     {
-                        var lf = obj as IJsonLoadField;
                         if (lf != null)
                         {
                             if (lf.OnJsonField(reader, key))
@@ -391,7 +400,44 @@ namespace PetaJson
                             setter(reader, obj);
                         }
                     });
+
+                    if (hasLoaded)
+                    {
+                        ((IJsonLoaded)obj).OnJsonLoaded(reader);
+                    }
                 };
+
+                // While we're at it, we might as well create a direct type converter too
+                RegisterParser(type, parseInto);
+
+                // Done
+                return parseInto;
+            }
+
+            static void RegisterParser(Type type, Action<IJsonReader, object> parseInto)
+            {
+                // Create a dynamic method that can do the work
+                var method = new DynamicMethod("dynamic_factory", typeof(object), new Type[] { typeof(IJsonReader), typeof(Action<IJsonReader, object>)}, true);
+                var il = method.GetILGenerator();
+
+                // Create the new object
+                var locObj = il.DeclareLocal(type);
+                il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Stloc, locObj);
+
+                il.Emit(OpCodes.Ldarg_1);           // parseinto delegate
+                il.Emit(OpCodes.Ldarg_0);           // IJsonReader
+                il.Emit(OpCodes.Ldloc, locObj);     // new object instance
+                il.Emit(OpCodes.Callvirt, typeof(Action<IJsonReader, object>).GetMethod("Invoke"));
+                il.Emit(OpCodes.Ret);
+
+                var factory = (Func<IJsonReader, Action<IJsonReader,object>, object>)method.CreateDelegate(typeof(Func<IJsonReader, Action<IJsonReader, object>, object>));
+
+                Json.RegisterParser(type, (reader, type2) =>
+                {
+                    return factory(reader, parseInto);
+                });
             }
 
             public static bool GetLiteralBool(IJsonReader r)
