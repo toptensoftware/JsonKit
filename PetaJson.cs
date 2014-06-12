@@ -488,21 +488,35 @@ namespace PetaJson
                     return reader.ReadLiteral(literal => Convert.ChangeType(literal, type, CultureInfo.InvariantCulture));
                 };
 
+                Func<IJsonReader, Type, object> numberConverter = (reader, type) =>
+                {
+                    switch (reader.GetLiteralKind())
+                    {
+                        case LiteralKind.SignedInteger:
+                        case LiteralKind.UnsignedInteger:
+                        case LiteralKind.FloatingPoint:
+                            object val = Convert.ChangeType(reader.GetLiteralString(), type, CultureInfo.InvariantCulture);
+                            reader.NextToken();
+                            return val;
+                    }
+                    throw new InvalidDataException("expected a numeric literal");
+                };
+
                 // Default type handlers
                 _parsers.Set(typeof(string), simpleConverter);
                 _parsers.Set(typeof(char), simpleConverter);
                 _parsers.Set(typeof(bool), simpleConverter);
-                _parsers.Set(typeof(byte), simpleConverter);
-                _parsers.Set(typeof(sbyte), simpleConverter);
-                _parsers.Set(typeof(short), simpleConverter);
-                _parsers.Set(typeof(ushort), simpleConverter);
-                _parsers.Set(typeof(int), simpleConverter);
-                _parsers.Set(typeof(uint), simpleConverter);
-                _parsers.Set(typeof(long), simpleConverter);
-                _parsers.Set(typeof(ulong), simpleConverter);
-                _parsers.Set(typeof(decimal), simpleConverter);
-                _parsers.Set(typeof(float), simpleConverter);
-                _parsers.Set(typeof(double), simpleConverter);
+                _parsers.Set(typeof(byte), numberConverter);
+                _parsers.Set(typeof(sbyte), numberConverter);
+                _parsers.Set(typeof(short), numberConverter);
+                _parsers.Set(typeof(ushort), numberConverter);
+                _parsers.Set(typeof(int), numberConverter);
+                _parsers.Set(typeof(uint), numberConverter);
+                _parsers.Set(typeof(long), numberConverter);
+                _parsers.Set(typeof(ulong), numberConverter);
+                _parsers.Set(typeof(decimal), numberConverter);
+                _parsers.Set(typeof(float), numberConverter);
+                _parsers.Set(typeof(double), numberConverter);
                 _parsers.Set(typeof(DateTime), (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Utils.FromUnixMilliseconds((long)Convert.ChangeType(literal, typeof(long), CultureInfo.InvariantCulture)));
@@ -2142,7 +2156,7 @@ namespace PetaJson
 
                 // Theses types we also generate for
                 var otherSupportedTypes = new Type[] {
-                    typeof(double), typeof(float), typeof(string), typeof(char), typeof(bool)
+                    typeof(double), typeof(float), typeof(string), typeof(char)
                 };
 
                 // Call IJsonWriting if implemented
@@ -2778,9 +2792,12 @@ namespace PetaJson
             // Helper to fetch a literal string from an IJsonReader
             public static string GetLiteralString(IJsonReader r)
             {
-                if (r.GetLiteralKind() != LiteralKind.String)
-                    throw new InvalidDataException("expected a string literal");
-                return r.GetLiteralString();
+                switch (r.GetLiteralKind())
+                {
+                    case LiteralKind.Null: return null;
+                    case LiteralKind.String: return r.GetLiteralString();
+                }
+                throw new InvalidDataException("expected a string literal");
             }
 
             // Helper to fetch a literal number from an IJsonReader (returns the raw string)

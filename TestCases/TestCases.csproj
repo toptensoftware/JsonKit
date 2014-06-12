@@ -53,6 +53,7 @@
     <Compile Include="TestAbstractTypes.cs" />
     <Compile Include="TestCustomFormat.cs" />
     <Compile Include="TestOptions.cs" />
+    <Compile Include="TestPrimitiveTypes.cs" />
     <Compile Include="TestsEvents.cs" />
     <Compile Include="TestsGeneral.cs" />
     <Compile Include="TestsReflection.cs" />
