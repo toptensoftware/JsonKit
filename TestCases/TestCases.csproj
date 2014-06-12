@@ -20,7 +20,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;PETAJSON_NO_EMIT</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -45,9 +45,6 @@
   <ItemGroup>
     <Compile Include="..\PetaJson.cs">
       <Link>PetaJson.cs</Link>
-    </Compile>
-    <Compile Include="..\PetaJsonEmit.cs">
-      <Link>PetaJsonEmit.cs</Link>
     </Compile>
     <Compile Include="PetaTest.cs" />
     <Compile Include="Program.cs" />

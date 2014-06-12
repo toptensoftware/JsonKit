@@ -147,7 +147,7 @@ namespace TestCases
 		[Test]
 		public void DynamicTest()
 		{
-			var d = Json.Parse<Dictionary<string, object>>("{\"apples\":1, \"pears\":2, \"bananas\":3}") ;
+			var d = Json.Parse<IDictionary<string, object>>("{\"apples\":1, \"pears\":2, \"bananas\":3}") ;
 
 			Assert.AreEquivalent(d.Keys, new string[] { "apples", "pears", "bananas" });
 			Assert.AreEquivalent(d.Values, new object[] { 1UL, 2UL, 3UL });

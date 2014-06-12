@@ -51,27 +51,12 @@ namespace EmitDev
         }
     }
 
-    [Json]
-    struct SimpleStruct
-    {
-        public int field;
-    }
 
     class Program
     {
 
         static void Main(string[] args)
         {
-            JsonEmit.Init();
-
-            var json = "{\"field\":23}";
-            var ss = Json.Parse<SimpleStruct>(json);
-
-
-
-            return;
-
-            /*
             var p = new Person()
             {
                 StringField = "Hello World",
@@ -108,7 +93,6 @@ namespace EmitDev
 
             var json2 = Json.Format(p2);
             Console.WriteLine(json2);
-             */
         }
     }
 }

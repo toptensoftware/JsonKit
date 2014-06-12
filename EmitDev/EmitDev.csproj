@@ -46,9 +46,6 @@
     <Compile Include="..\PetaJson.cs">
       <Link>PetaJson.cs</Link>
     </Compile>
-    <Compile Include="..\PetaJsonEmit.cs">
-      <Link>PetaJsonEmit.cs</Link>
-    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

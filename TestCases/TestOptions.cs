@@ -52,7 +52,7 @@ namespace TestCases
             // Nonstrict parser allows it
             var array = Json.Parse<int[]>(arrayWithTrailingComma, JsonOptions.NonStrictParser);
             Assert.AreEqual(array.Length, 2);
-            var dict = Json.Parse<Dictionary<string, object>>(dictWithTrailingComma, JsonOptions.NonStrictParser);
+            var dict = Json.Parse<IDictionary<string, object>>(dictWithTrailingComma, JsonOptions.NonStrictParser);
             Assert.AreEqual(dict.Count, 2);
 
             // Strict parser
@@ -65,7 +65,7 @@ namespace TestCases
         {
             var data = "{a:1,b:2}";
 
-            var dict = Json.Parse<Dictionary<string, object>>(data, JsonOptions.NonStrictParser);
+            var dict = Json.Parse<IDictionary<string, object>>(data, JsonOptions.NonStrictParser);
             Assert.AreEqual(dict.Count, 2);
             Assert.Contains(dict.Keys, "a");
             Assert.Contains(dict.Keys, "b");
