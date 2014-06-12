@@ -21,7 +21,7 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 
 Here goes, a 5 minute whirl-wind tour of using PetaJson...
 
-## Setup (portable)
+## Setup
 
 1. Add PetaJson.cs to your project
 2. That's it
