@@ -7,6 +7,7 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 * Supports weakly typed serialization
 * Supports standard C# collection classes - no JSON specific classes (ie: no "JArray", "JObject" etc...)
 * Support for dynamic Expando (read) and anonymous types (write)
+* Choose from good performance + portable (System.Reflection), or high performance + less portable (using System.Reflection.Emit)
 * Custom formatting and parsing of any type
 * Support for serialization of abstract/virtual types
 * Directly reads from TextReader and writes to TextWriter and any underlying stream
@@ -20,11 +21,16 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 
 Here goes, a 5 minute whirl-wind tour of using PetaJson...
 
-## Setup
+## Setup (portable)
 
 1. Add PetaJson.cs to your project
 2. Optionally add "using PetaJson;" clauses as required
 3. That's it
+
+# Setup (performance)
+
+1. As above + also add PetaJsonEmit.cs to your project
+2. Call PetaJson.JsonEmit.Init() from your startup code
 
 ## Generating JSON
 
@@ -164,6 +170,8 @@ In this example the existing CurrentSettings object will be serialized into. If 
 was set to false, PetaJson would instantiate a new Settings object, load it and then assign
 it to the CurrentSettings property.
 
+
+Note: support for standard [DataContract] and [DataMember] probably coming soon.
 
 ## Custom Formatting
 
@@ -381,19 +389,6 @@ eg: the non-strict parser will allow this:
 		"arrayWithTrailingComma": [1,2,3,],	
 		"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
 	}
-
-## Ramping it Up
-
-By itself, PetaJson provides a fairly simple, lightweight Json parser that is very portable and 
-performs reasonably well for many scenarios.  If however you need something with a bit more
-performance, there's an extension that uses System.Reflection.Emit to generate code at runtime
-and really speeds things up.
-
-To use it, simply add the file PetaJsonEmit.cs to your project and call PetaJson.JsonEmit.Init()
-from your startup code somewhere.
-
-With this enabled, performance is on-par (or possibly better) than most other Json parsers.
-
 
 ## IJsonReader and IJsonWriter
 
