@@ -1052,8 +1052,20 @@ namespace PetaJson
                 _writer.Write(str);
             }
 
-            // Write a string, escaping as necessary
-            static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\f', '\0', '\\', '\'' };
+            static int IndexOfEscapeableChar(string str, int pos)
+            {
+                int length = str.Length;
+                while (pos < length)
+                {
+                    var ch = str[pos];
+                    if (ch == '\\' || ch == '/' || ch == '\"' || ch < 32)
+                        return pos;
+                    pos++;
+                }
+
+                return -1;
+            }
+
             public void WriteStringLiteral(string str)
             {
                 if (str == null)
@@ -1065,7 +1077,7 @@ namespace PetaJson
 
                 int pos = 0;
                 int escapePos;
-                while ((escapePos = str.IndexOfAny(_charsToEscape, pos)) >= 0)
+                while ((escapePos = IndexOfEscapeableChar(str, pos)) >= 0)
                 {
                     if (escapePos > pos)
                         _writer.Write(str.Substring(pos, escapePos - pos));
@@ -1073,13 +1085,16 @@ namespace PetaJson
                     switch (str[escapePos])
                     {
                         case '\"': _writer.Write("\\\""); break;
-                        case '\r': _writer.Write("\\r"); break;
-                        case '\n': _writer.Write("\\n"); break;
-                        case '\t': _writer.Write("\\t"); break;
-                        case '\f': _writer.Write("\\f"); break;
-                        case '\0': _writer.Write("\\0"); break;
                         case '\\': _writer.Write("\\\\"); break;
-                        case '\'': _writer.Write("\\'"); break;
+                        case '/':  _writer.Write("\\/"); break;
+                        case '\b': _writer.Write("\\b"); break;
+                        case '\f': _writer.Write("\\f"); break;
+                        case '\n': _writer.Write("\\n"); break;
+                        case '\r': _writer.Write("\\r"); break;
+                        case '\t': _writer.Write("\\t"); break;
+                        default:
+                            _writer.Write(string.Format("\\u{0:x4}", (int)str[escapePos]));
+                            break;
                     }
 
                     pos = escapePos + 1;
@@ -1868,14 +1883,14 @@ namespace PetaJson
                                     var escape = _currentChar;
                                     switch (escape)
                                     {
-                                        case '\'': _sb.Append('\''); break;
                                         case '\"': _sb.Append('\"'); break;
                                         case '\\': _sb.Append('\\'); break;
-                                        case 'r': _sb.Append('\r'); break;
+                                        case '/': _sb.Append('/'); break;
+                                        case 'b': _sb.Append('\b'); break;
                                         case 'f': _sb.Append('\f'); break;
                                         case 'n': _sb.Append('\n'); break;
+                                        case 'r': _sb.Append('\r'); break;
                                         case 't': _sb.Append('\t'); break;
-                                        case '0': _sb.Append('\0'); break;
                                         case 'u':
                                             var sbHex = new StringBuilder();
                                             for (int i = 0; i < 4; i++)

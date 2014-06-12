@@ -27,7 +27,7 @@ namespace TestCases
 		public void Format_String()
 		{
 			Assert.AreEqual(Json.Format("Hello World"), "\"Hello World\"");
-			Assert.AreEqual(Json.Format("\r\n\t\0\"\'\\"), "\"\\r\\n\\t\\0\\\"\\'\\\\\"");
+            Assert.AreEqual(Json.Format(" \" \\ / \b \f \n \r \t \0 \u1234"), "\" \\\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0000 \u1234\"");
 		}
 
 		[Test]
