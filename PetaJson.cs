@@ -1058,7 +1058,7 @@ namespace PetaJson
                 while (pos < length)
                 {
                     var ch = str[pos];
-                    if (ch == '\\' || ch == '/' || ch == '\"' || ch < 32)
+                    if (ch == '\\' || ch == '/' || ch == '\"' || (ch>=0 && ch <= 0x1f) || (ch >= 0x7f && ch <=0x9f) || ch==0x2028 || ch== 0x2029)
                         return pos;
                     pos++;
                 }
@@ -1999,7 +1999,7 @@ namespace PetaJson
 
                 // Hex prefix?
                 bool hex = false;
-                if (_currentChar == '0')
+                if (_currentChar == '0' && (_options & JsonOptions.StrictParser)==0)
                 {
                     _sb.Append(_currentChar);
                     NextChar();

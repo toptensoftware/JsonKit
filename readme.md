@@ -12,7 +12,7 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 * Support for serialization of abstract/virtual types
 * Directly reads from TextReader and writes to TextWriter and any underlying stream
 * Simple set of custom attributes to control serialization
-* Optional non-strict parsing allows comments, non-quoted dictionary keys and trailing commas (great for config files)
+* Optional non-strict parsing allows comments, non-quoted dictionary keys, trailing commas and hex literals (great for config files)
 * Optional pretty formatting
 * No dependencies, one file - PetaJson.cs
 * Works on .NET, Mono, Xamarin.Android, Xamarin.iOS.
@@ -395,6 +395,7 @@ Non-strict mode relaxes the parser to allow:
 * Inline C /* */ or C++ // style comments
 * Trailing commas in arrays and dictionaries
 * Non-quoted dictionary keys
+* Hex number literals
 
 eg: the non-strict parser will allow this:
 
@@ -403,6 +404,7 @@ eg: the non-strict parser will allow this:
 		"quotedKey": "allowed",
 		nonQuotedKey: "also allowed",
 		"arrayWithTrailingComma": [1,2,3,],	
+		"hexAllowed": 0x1234,
 		"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
 	}
 
