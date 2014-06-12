@@ -15,6 +15,7 @@ using System.IO;
 using System.Reflection;
 using System.Globalization;
 using System.Collections;
+using System.Threading;
 #if PETAJSON_DYNAMIC
 using System.Dynamic;
 #endif
@@ -205,7 +206,7 @@ namespace PetaJson
         // Register a parser for a specified type
         public static void RegisterParser(Type type, Func<IJsonReader, Type, object> parser)
         {
-            Internal.Reader._parsers[type] = parser;
+            Internal.Reader._parsers.Set(type, parser);
         }
 
         // Register a typed parser
@@ -229,7 +230,7 @@ namespace PetaJson
         // Register an into parser
         public static void RegisterIntoParser(Type type, Action<IJsonReader, object> parser)
         {
-            Internal.Reader._intoParsers[type] = parser;
+            Internal.Reader._intoParsers.Set(type, parser);
         }
 
         // Register an into parser
@@ -243,7 +244,7 @@ namespace PetaJson
         // instance and which point it will switch to serialization using reflection
         public static void RegisterTypeFactory(Type type, Func<IJsonReader, string, object> factory)
         {
-            Internal.Reader._typeFactories[type] = factory;
+            Internal.Reader._typeFactories.Set(type, factory);
         }
 
         // Register a callback to provide a formatter for a newly encountered type
@@ -460,25 +461,25 @@ namespace PetaJson
                 };
 
                 // Default type handlers
-                _parsers.Add(typeof(string), simpleConverter);
-                _parsers.Add(typeof(char), simpleConverter);
-                _parsers.Add(typeof(bool), simpleConverter);
-                _parsers.Add(typeof(byte), simpleConverter);
-                _parsers.Add(typeof(sbyte), simpleConverter);
-                _parsers.Add(typeof(short), simpleConverter);
-                _parsers.Add(typeof(ushort), simpleConverter);
-                _parsers.Add(typeof(int), simpleConverter);
-                _parsers.Add(typeof(uint), simpleConverter);
-                _parsers.Add(typeof(long), simpleConverter);
-                _parsers.Add(typeof(ulong), simpleConverter);
-                _parsers.Add(typeof(decimal), simpleConverter);
-                _parsers.Add(typeof(float), simpleConverter);
-                _parsers.Add(typeof(double), simpleConverter);
-                _parsers.Add(typeof(DateTime), (reader, type) =>
+                _parsers.Set(typeof(string), simpleConverter);
+                _parsers.Set(typeof(char), simpleConverter);
+                _parsers.Set(typeof(bool), simpleConverter);
+                _parsers.Set(typeof(byte), simpleConverter);
+                _parsers.Set(typeof(sbyte), simpleConverter);
+                _parsers.Set(typeof(short), simpleConverter);
+                _parsers.Set(typeof(ushort), simpleConverter);
+                _parsers.Set(typeof(int), simpleConverter);
+                _parsers.Set(typeof(uint), simpleConverter);
+                _parsers.Set(typeof(long), simpleConverter);
+                _parsers.Set(typeof(ulong), simpleConverter);
+                _parsers.Set(typeof(decimal), simpleConverter);
+                _parsers.Set(typeof(float), simpleConverter);
+                _parsers.Set(typeof(double), simpleConverter);
+                _parsers.Set(typeof(DateTime), (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Utils.FromUnixMilliseconds((long)Convert.ChangeType(literal, typeof(long), CultureInfo.InvariantCulture)));
                 });
-                _parsers.Add(typeof(byte[]), (reader, type) =>
+                _parsers.Set(typeof(byte[]), (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Convert.FromBase64String((string)Convert.ChangeType(literal, typeof(string), CultureInfo.InvariantCulture)));
                 });
@@ -663,10 +664,9 @@ namespace PetaJson
                 // Call value type resolver
                 if (type.IsValueType)
                 {
-                    var tp = _parserResolver(type);
+                    var tp = _parsers.Get(type, () => _parserResolver(type));
                     if (tp != null)
                     {
-                        _parsers[type] = tp;
                         return tp(this, type);
                     }
                 }
@@ -761,10 +761,9 @@ namespace PetaJson
                 }
 
                 // Try to resolve a parser
-                var intoParser = _intoParserResolver(type);
+                var intoParser = _intoParsers.Get(type, () => _intoParserResolver(type));
                 if (intoParser != null)
                 {
-                    _intoParsers[type] = intoParser;
                     intoParser(this, into);
                     return;
                 }
@@ -878,9 +877,9 @@ namespace PetaJson
             // Yikes!
             public static Func<Type, Action<IJsonReader, object>> _intoParserResolver;
             public static Func<Type, Func<IJsonReader, Type, object>> _parserResolver;
-            public static Dictionary<Type, Func<IJsonReader, Type, object>> _parsers = new Dictionary<Type, Func<IJsonReader, Type, object>>();
-            public static Dictionary<Type, Action<IJsonReader, object>> _intoParsers = new Dictionary<Type, Action<IJsonReader, object>>();
-            public static Dictionary<Type, Func<IJsonReader, string, object>> _typeFactories = new Dictionary<Type, Func<IJsonReader, string, object>>();
+            public static ThreadSafeCache<Type, Func<IJsonReader, Type, object>> _parsers = new ThreadSafeCache<Type, Func<IJsonReader, Type, object>>();
+            public static ThreadSafeCache<Type, Action<IJsonReader, object>> _intoParsers = new ThreadSafeCache<Type, Action<IJsonReader, object>>();
+            public static ThreadSafeCache<Type, Func<IJsonReader, string, object>> _typeFactories = new ThreadSafeCache<Type, Func<IJsonReader, string, object>>();
         }
 
         public class Writer : IJsonWriter
@@ -1221,7 +1220,7 @@ namespace PetaJson
             public List<JsonMemberInfo> Members;
 
             // Cache of these ReflectionInfos's
-            static Dictionary<Type, ReflectionInfo> _cache = new Dictionary<Type, ReflectionInfo>();
+            static ThreadSafeCache<Type, ReflectionInfo> _cache = new ThreadSafeCache<Type, ReflectionInfo>();
 
             // Write one of these types
             public void Write(IJsonWriter w, object val)
@@ -1320,55 +1319,52 @@ namespace PetaJson
             // Get the reflection info for a specified type
             public static ReflectionInfo GetReflectionInfo(Type type)
             {
-                // Already created?
-                ReflectionInfo existing;
-                if (_cache.TryGetValue(type, out existing))
-                    return existing;
-
-                // Does type have a [Json] attribute
-                bool typeMarked = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().Any();
-
-                // Do any members have a [Json] attribute
-                bool anyFieldsMarked = Utils.GetAllFieldsAndProperties(type).Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
-
-                // Should we serialize all public methods?
-                bool serializeAllPublics = typeMarked || !anyFieldsMarked;
-
-                // Build 
-                var ri = CreateReflectionInfo(type, mi =>
+                // Check cache
+                return _cache.Get(type, () =>
                 {
-                    // Explicitly excluded?
-                    if (mi.GetCustomAttributes(typeof(JsonExcludeAttribute), false).OfType<JsonExcludeAttribute>().Any())
+                    // Does type have a [Json] attribute
+                    bool typeMarked = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().Any();
+
+                    // Do any members have a [Json] attribute
+                    bool anyFieldsMarked = Utils.GetAllFieldsAndProperties(type).Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
+
+                    // Should we serialize all public methods?
+                    bool serializeAllPublics = typeMarked || !anyFieldsMarked;
+
+                    // Build 
+                    var ri = CreateReflectionInfo(type, mi =>
+                    {
+                        // Explicitly excluded?
+                        if (mi.GetCustomAttributes(typeof(JsonExcludeAttribute), false).OfType<JsonExcludeAttribute>().Any())
+                            return null;
+
+                        // Get attributes
+                        var attr = mi.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().FirstOrDefault();
+                        if (attr != null)
+                        {
+                            return new JsonMemberInfo()
+                            {
+                                Member = mi,
+                                JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
+                                KeepInstance = attr.KeepInstance,
+                            };
+                        }
+
+                        // Serialize all publics?
+                        if (serializeAllPublics && Utils.IsPublic(mi))
+                        {
+                            return new JsonMemberInfo()
+                            {
+                                Member = mi,
+                                JsonKey = mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
+                            };
+                        }
+
                         return null;
+                    });
 
-                    // Get attributes
-                    var attr = mi.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().FirstOrDefault();
-                    if (attr != null)
-                    {
-                        return new JsonMemberInfo()
-                        {
-                            Member = mi,
-                            JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
-                            KeepInstance = attr.KeepInstance,
-                        };
-                    }
-
-                    // Serialize all publics?
-                    if (serializeAllPublics && Utils.IsPublic(mi))
-                    {
-                        return new JsonMemberInfo()
-                        {
-                            Member = mi,
-                            JsonKey = mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
-                        };
-                    }
-
-                    return null;
+                    return ri;
                 });
-
-                // Cache it
-                _cache[type] = ri;
-                return ri;
             }
 
             public static ReflectionInfo CreateReflectionInfo(Type type, Func<MemberInfo, JsonMemberInfo> callback)
@@ -1390,6 +1386,78 @@ namespace PetaJson
                 // Create reflection info
                 return new ReflectionInfo() { Members = members };
             }
+        }
+
+        public class ThreadSafeCache<TKey, TValue>
+        {
+            public ThreadSafeCache()
+            {
+
+            }
+
+            public TValue Get(TKey key, Func<TValue> createIt)
+            {
+                // Check if already exists
+                _lock.EnterReadLock();
+                try
+                {
+                    TValue val;
+                    if (_map.TryGetValue(key, out val))
+                        return val;
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+
+                // Nope, take lock and try again
+                _lock.EnterWriteLock();
+                try
+                {
+                    // Check again before creating it
+                    TValue val;
+                    if (!_map.TryGetValue(key, out val))
+                    {
+                        // Now create it
+                        val = createIt();
+                        _map[key] = val;
+                    }
+                    return val;
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
+
+            public bool TryGetValue(TKey key, out TValue val)
+            {
+                _lock.EnterReadLock();
+                try
+                {
+                    return _map.TryGetValue(key, out val);
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+            }
+
+            public void Set(TKey key, TValue value)
+            {
+                _lock.EnterWriteLock();
+                try
+                {
+                    _map[key] = value;
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
+
+            Dictionary<TKey, TValue> _map = new Dictionary<TKey,TValue>();
+            ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
         }
 
         internal static class Utils
