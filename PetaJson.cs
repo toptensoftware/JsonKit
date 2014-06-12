@@ -7,6 +7,7 @@
 
 // Define PETAJSON_NO_DYNAMIC to disable Expando support
 // Define PETAJSON_NO_EMIT to disable Reflection.Emit
+// Define PETAJSON_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
 
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,10 @@ using System.Dynamic;
 #if !PETAJSON_NO_EMIT
 using System.Reflection.Emit;
 #endif
+#if !PETAJSON_NO_DATACONTRACT
+using System.Runtime.Serialization;
+#endif
+
 
 
 namespace PetaJson
@@ -402,6 +407,11 @@ namespace PetaJson
     // [Json] without the keyname will be serialized using the name of the member with the first letter lowercased.
     //
     // [Json(KeepInstance=true)] causes container/subobject types to be serialized into the existing member instance (if not null)
+    //
+    // You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
+    // are no PetaJson attributes on the class or it's members. You must specify DataContract on the type and
+    // DataMember on any fields/properties that require serialization.  There's no need for exclude attribute.
+    // When using DataMember, the name of the field or property is used as is - the first letter is left in upper case
     //
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
     public class JsonAttribute : Attribute
@@ -1025,6 +1035,11 @@ namespace PetaJson
             static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\f', '\0', '\\', '\'' };
             public void WriteStringLiteral(string str)
             {
+                if (str == null)
+                {
+                    _writer.Write("null");
+                    return;
+                }
                 _writer.Write("\"");
 
                 int pos = 0;
@@ -1333,48 +1348,75 @@ namespace PetaJson
                 // Check cache
                 return _cache.Get(type, () =>
                 {
+                    var allMembers = Utils.GetAllFieldsAndProperties(type); 
+
                     // Does type have a [Json] attribute
                     bool typeMarked = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().Any();
 
                     // Do any members have a [Json] attribute
-                    bool anyFieldsMarked = Utils.GetAllFieldsAndProperties(type).Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
+                    bool anyFieldsMarked = allMembers.Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
 
-                    // Should we serialize all public methods?
-                    bool serializeAllPublics = typeMarked || !anyFieldsMarked;
-
-                    // Build 
-                    var ri = CreateReflectionInfo(type, mi =>
+#if !PETAJSON_NO_DATACONTRACT
+                    // Try with DataContract and friends
+                    if (!typeMarked && !anyFieldsMarked && type.GetCustomAttributes(typeof(DataContractAttribute), true).OfType<DataContractAttribute>().Any())
                     {
-                        // Explicitly excluded?
-                        if (mi.GetCustomAttributes(typeof(JsonExcludeAttribute), false).OfType<JsonExcludeAttribute>().Any())
+                        var ri = CreateReflectionInfo(type, mi =>
+                        {
+                            // Get attributes
+                            var attr = mi.GetCustomAttributes(typeof(DataMemberAttribute), false).OfType<DataMemberAttribute>().FirstOrDefault();
+                            if (attr != null)
+                            {
+                                return new JsonMemberInfo()
+                                {
+                                    Member = mi,
+                                    JsonKey = attr.Name ?? mi.Name,     // No lower case first letter if using DataContract/Member
+                                };
+                            }
+
                             return null;
+                        });
 
-                        // Get attributes
-                        var attr = mi.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().FirstOrDefault();
-                        if (attr != null)
+                        ri.Members.Sort((a, b) => String.CompareOrdinal(a.JsonKey, b.JsonKey));    // Match DataContractJsonSerializer
+                        return ri;
+                    }
+#endif
+                    {
+                        // Should we serialize all public methods?
+                        bool serializeAllPublics = typeMarked || !anyFieldsMarked;
+
+                        // Build 
+                        var ri = CreateReflectionInfo(type, mi =>
                         {
-                            return new JsonMemberInfo()
+                            // Explicitly excluded?
+                            if (mi.GetCustomAttributes(typeof(JsonExcludeAttribute), false).Any())
+                                return null;
+
+                            // Get attributes
+                            var attr = mi.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().FirstOrDefault();
+                            if (attr != null)
                             {
-                                Member = mi,
-                                JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
-                                KeepInstance = attr.KeepInstance,
-                            };
-                        }
+                                return new JsonMemberInfo()
+                                {
+                                    Member = mi,
+                                    JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
+                                    KeepInstance = attr.KeepInstance,
+                                };
+                            }
 
-                        // Serialize all publics?
-                        if (serializeAllPublics && Utils.IsPublic(mi))
-                        {
-                            return new JsonMemberInfo()
+                            // Serialize all publics?
+                            if (serializeAllPublics && Utils.IsPublic(mi))
                             {
-                                Member = mi,
-                                JsonKey = mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
-                            };
-                        }
+                                return new JsonMemberInfo()
+                                {
+                                    Member = mi,
+                                    JsonKey = mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
+                                };
+                            }
 
-                        return null;
-                    });
-
-                    return ri;
+                            return null;
+                        });
+                        return ri;
+                    }
                 });
             }
 

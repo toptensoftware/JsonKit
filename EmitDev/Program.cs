@@ -4,6 +4,9 @@ using System.Linq;
 using System.Text;
 using PetaJson;
 using System.Globalization;
+using System.Runtime.Serialization.Json;
+using System.IO;
+using System.Runtime.Serialization;
 
 namespace EmitDev
 {
@@ -51,12 +54,33 @@ namespace EmitDev
         }
     }
 
+    [DataContract]
+    class DCTest
+    {
+        [DataMember(Name="AAA")] public string ZZZ;
+        [DataMember] private int priv;
+        [DataMember] public string Prop { get; set; }
+        [DataMember] public string Field;
+    }
 
     class Program
     {
 
         static void Main(string[] args)
         {
+            Json.WriteWhitespaceDefault = false;
+
+            var dc = new DCTest() { Prop = "Hi", Field = "Bye" };
+            var ser = new DataContractJsonSerializer(typeof(DCTest));
+            var memStream = new MemoryStream();
+            ser.WriteObject(memStream, dc);
+            var str = Encoding.UTF8.GetString(memStream.GetBuffer());
+            Console.WriteLine(str);
+
+            Console.WriteLine(Json.Format(dc));
+            return;
+
+
             var p = new Person()
             {
                 StringField = "Hello World",

@@ -169,8 +169,24 @@ In this example the existing CurrentSettings object will be serialized into. If 
 was set to false, PetaJson would instantiate a new Settings object, load it and then assign
 it to the CurrentSettings property.
 
+## DataContract and DataMember attributes
 
-Note: support for standard [DataContract] and [DataMember] probably coming soon.
+You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
+are no PetaJson attributes on the class or it's members. You must specify DataContract on the type and
+DataMember on all members that require serialization.  
+
+	[DataContract]
+	class Person
+	{
+		[DataMember] public string Name;		// Serialized as "Name"
+		[DataMember] public string Address;		// Serialized as "Address"
+		[DataMember(Name="Cool")]
+		public string Hot;						// Serialized as "Cool"
+		public int Age {...}					// Not serialized
+	}
+
+Note that the first letter of the member is left as upper case (unlike when using the Json attributes) and
+there's no need for an exclude attribute as only members marked DataMember are included in the first place.
 
 ## Custom Formatting
 
