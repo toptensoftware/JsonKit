@@ -36,7 +36,7 @@ Well almost, you'll probably want some `using PetaJson;` clauses and depending o
 
 To a string:
 
-	var o = new [] { 1, 2, 3 };
+	var o = new int[] { 1, 2, 3 };
 	var json = Json.Format(o);
 
 or, write to a file
