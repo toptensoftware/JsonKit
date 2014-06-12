@@ -446,7 +446,8 @@ routine must read each value from the IJsonReader before returning.
 *Parse* - parses a typed value from the input stream.
 
 *GetLiteralKind*, *GetLiteralString* and *NextToken* provide ability to read literals without boxing
-the value.  Used by the PetaJsonEmit.
+the value into an Object.  Used by the "Reflection.Emit" type parsers, these are much faster than 
+ReadLiteral, but less convenient to use.
 
 ### IJsonWriter
 
