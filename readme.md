@@ -30,6 +30,7 @@ Well almost, you'll probably want some `using PetaJson;` clauses and depending o
 
 * `PETAJSON_NO_DYNAMIC` - disable support for System.Dynamic.ExpandoObject
 * `PETAJSON_NO_EMIT` - disable use of System.Reflection.Emit (slower, more portable)
+* `PETAJSON_NO_DATACONTRACT` - disable support for System.Runtime.Serialization.DataContract/Member
 
 ## Generating JSON
 
@@ -320,7 +321,7 @@ Note that the field used to hold the type (ie: "kind") does not need to be the f
 
 ## Serialization Events
 
-An object can get notifications of various events during the serialization/deserialization process
+An object can receive notifications of various events during the serialization/deserialization process
 by implementing one or more of the following interfaces:
 
     // Called before loading via reflection
