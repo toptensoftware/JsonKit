@@ -193,7 +193,7 @@ namespace PetaJson
         // Register a callback that can format a value of a particular type into json
         public static void RegisterFormatter(Type type, Action<IJsonWriter, object> formatter)
         {
-            Internal.Writer._typeWriters[type] = formatter;
+            Internal.Writer._formatters[type] = formatter;
         }
 
         // Typed version of above
@@ -205,7 +205,7 @@ namespace PetaJson
         // Register a parser for a specified type
         public static void RegisterParser(Type type, Func<IJsonReader, Type, object> parser)
         {
-            Internal.Reader._typeParsers[type] = parser;
+            Internal.Reader._parsers[type] = parser;
         }
 
         // Register a typed parser
@@ -226,19 +226,16 @@ namespace PetaJson
             RegisterParser(typeof(T), literal => parser(literal));
         }
 
-        public static void SetTypeFormatterResolver(Func<Type, Action<IJsonWriter, object>> resolver)
+        // Register an into parser
+        public static void RegisterIntoParser(Type type, Action<IJsonReader, object> parser)
         {
-            Internal.Writer._typeWriterResolver = resolver;
+            Internal.Reader._intoParsers[type] = parser;
         }
 
-        public static void SetTypeParserResolver(Func<Type, Func<IJsonReader, Type, object>> resolver)
+        // Register an into parser
+        public static void RegisterIntoParser<T>(Action<IJsonReader, object> parser)
         {
-            Internal.Reader._typeParserResolver = resolver;
-        }
-
-        public static void SetTypeIntoParserResolver(Func<Type, Action<IJsonReader, object>> resolver)
-        {
-            Internal.Reader._typeIntoParserResolver = resolver;
+            RegisterIntoParser(typeof(T), parser);
         }
 
         // Register a factory for instantiating objects (typically abstract classes)
@@ -247,6 +244,24 @@ namespace PetaJson
         public static void RegisterTypeFactory(Type type, Func<IJsonReader, string, object> factory)
         {
             Internal.Reader._typeFactories[type] = factory;
+        }
+
+        // Register a callback to provide a formatter for a newly encountered type
+        public static void SetFormatterResolver(Func<Type, Action<IJsonWriter, object>> resolver)
+        {
+            Internal.Writer._formatterResolver = resolver;
+        }
+
+        // Register a callback to provide a parser for a newly encountered value type
+        public static void SetParserResolver(Func<Type, Func<IJsonReader, Type, object>> resolver)
+        {
+            Internal.Reader._parserResolver = resolver;
+        }
+
+        // Register a callback to provide a parser for a newly encountered reference type
+        public static void SetIntoParserResolver(Func<Type, Action<IJsonReader, object>> resolver)
+        {
+            Internal.Reader._intoParserResolver = resolver;
         }
 
         // Resolve passed options        
@@ -299,6 +314,7 @@ namespace PetaJson
         void OnJsonWritten(IJsonWriter w);
     }
 
+    // Describes the current literal in the json stream
     public enum LiteralKind
     {
         None,
@@ -314,12 +330,13 @@ namespace PetaJson
     // Passed to registered parsers
     public interface IJsonReader
     {
-        object ReadLiteral(Func<object, object> converter);
-        void ReadDictionary(Action<string> callback);
-        void ReadArray(Action callback);
         object Parse(Type type);
         T Parse<T>();
         void ParseInto(object into);
+
+        object ReadLiteral(Func<object, object> converter);
+        void ParseDictionary(Action<string> callback);
+        void ParseArray(Action callback);
 
         LiteralKind GetLiteralKind();
         string GetLiteralString();
@@ -350,7 +367,7 @@ namespace PetaJson
         public JsonLineOffset Position;
     }
 
-    // Stores a line, character offset in source file
+    // Represents a line and character offset position in the source Json
     public struct JsonLineOffset
     {
         public int Line;
@@ -403,7 +420,7 @@ namespace PetaJson
         }
     }
 
-    // See comments above
+    // See comments for JsonAttribute above
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class JsonExcludeAttribute : Attribute
     {
@@ -433,35 +450,35 @@ namespace PetaJson
         {
             static Reader()
             {
-                _typeIntoParserResolver = ResolveParseInto;
-                _typeParserResolver = ResolveParse;
+                // Setup default resolvers
+                _parserResolver = ResolveParser;
+                _intoParserResolver = ResolveIntoParser;
 
                 Func<IJsonReader, Type, object> simpleConverter = (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Convert.ChangeType(literal, type, CultureInfo.InvariantCulture));
                 };
 
-                _typeParsers.Add(typeof(string), simpleConverter);
-                _typeParsers.Add(typeof(char), simpleConverter);
-                _typeParsers.Add(typeof(bool), simpleConverter);
-                _typeParsers.Add(typeof(byte), simpleConverter);
-                _typeParsers.Add(typeof(sbyte), simpleConverter);
-                _typeParsers.Add(typeof(short), simpleConverter);
-                _typeParsers.Add(typeof(ushort), simpleConverter);
-                _typeParsers.Add(typeof(int), simpleConverter);
-                _typeParsers.Add(typeof(uint), simpleConverter);
-                _typeParsers.Add(typeof(long), simpleConverter);
-                _typeParsers.Add(typeof(ulong), simpleConverter);
-                _typeParsers.Add(typeof(decimal), simpleConverter);
-                _typeParsers.Add(typeof(float), simpleConverter);
-                _typeParsers.Add(typeof(double), simpleConverter);
-
-                _typeParsers.Add(typeof(DateTime), (reader, type) =>
+                // Default type handlers
+                _parsers.Add(typeof(string), simpleConverter);
+                _parsers.Add(typeof(char), simpleConverter);
+                _parsers.Add(typeof(bool), simpleConverter);
+                _parsers.Add(typeof(byte), simpleConverter);
+                _parsers.Add(typeof(sbyte), simpleConverter);
+                _parsers.Add(typeof(short), simpleConverter);
+                _parsers.Add(typeof(ushort), simpleConverter);
+                _parsers.Add(typeof(int), simpleConverter);
+                _parsers.Add(typeof(uint), simpleConverter);
+                _parsers.Add(typeof(long), simpleConverter);
+                _parsers.Add(typeof(ulong), simpleConverter);
+                _parsers.Add(typeof(decimal), simpleConverter);
+                _parsers.Add(typeof(float), simpleConverter);
+                _parsers.Add(typeof(double), simpleConverter);
+                _parsers.Add(typeof(DateTime), (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Utils.FromUnixMilliseconds((long)Convert.ChangeType(literal, typeof(long), CultureInfo.InvariantCulture)));
                 });
-
-                _typeParsers.Add(typeof(byte[]), (reader, type) =>
+                _parsers.Add(typeof(byte[]), (reader, type) =>
                 {
                     return reader.ReadLiteral(literal => Convert.FromBase64String((string)Convert.ChangeType(literal, typeof(string), CultureInfo.InvariantCulture)));
                 });
@@ -473,7 +490,10 @@ namespace PetaJson
                 _options = options;
             }
 
-            static Action<IJsonReader, object> ResolveParseInto(Type type)
+            Tokenizer _tokenizer;
+            JsonOptions _options;
+
+            static Action<IJsonReader, object> ResolveIntoParser(Type type)
             {
                 var ri = ReflectionInfo.GetReflectionInfo(type);
                 if (ri != null)
@@ -482,7 +502,7 @@ namespace PetaJson
                     return null;
             }
 
-            static Func<IJsonReader, Type, object> ResolveParse(Type type)
+            static Func<IJsonReader, Type, object> ResolveParser(Type type)
             {
                 return (r, t) =>
                 {
@@ -491,11 +511,6 @@ namespace PetaJson
                     return into;
                 };
             }
-
-            
-
-            Tokenizer _tokenizer;
-            JsonOptions _options;
 
             public JsonLineOffset CurrentTokenPosition
             {
@@ -534,18 +549,18 @@ namespace PetaJson
                     type = typeUnderlying;
 
                 // See if we have a reader
-                Func<IJsonReader, Type, object> typeReader;
-                if (Reader._typeParsers.TryGetValue(type, out typeReader))
+                Func<IJsonReader, Type, object> parser;
+                if (Reader._parsers.TryGetValue(type, out parser))
                 {
-                    return typeReader(this, type);
+                    return parser(this, type);
                 }
 
                 // See if we have factory
-                Func<IJsonReader, string, object> typeFactory;
-                if (Reader._typeFactories.TryGetValue(type, out typeFactory))
+                Func<IJsonReader, string, object> factory;
+                if (Reader._typeFactories.TryGetValue(type, out factory))
                 {
                     // Try first without passing dictionary keys
-                    object into = typeFactory(this, null);
+                    object into = factory(this, null);
                     if (into == null)
                     {
                         // This is a awkward situation.  The factory requires a value from the dictionary
@@ -562,10 +577,10 @@ namespace PetaJson
                         _tokenizer.Skip(Token.OpenBrace);
 
                         // First pass to work out type
-                        ReadDictionaryKeys(key =>
+                        ParseDictionaryKeys(key =>
                         {
                             // Try to instantiate the object
-                            into = typeFactory(this, key);
+                            into = factory(this, key);
                             return into == null;
                         });
 
@@ -584,9 +599,9 @@ namespace PetaJson
                     return into;
                 }
 
-                // Do we already have an into reader?
-                Action<IJsonReader, object> typeIntoReader;
-                if (Reader._typeIntoParsers.TryGetValue(type, out typeIntoReader))
+                // Do we already have an into parser?
+                Action<IJsonReader, object> intoParser;
+                if (Reader._intoParsers.TryGetValue(type, out intoParser))
                 {
                     var into = Activator.CreateInstance(type);
                     ParseInto(into);
@@ -618,7 +633,7 @@ namespace PetaJson
 #else
                     var container = new Dictionary<string, object>();
 #endif
-                    ReadDictionary(key =>
+                    ParseDictionary(key =>
                     {
                         container[key] = Parse(typeof(Object));
                     });
@@ -630,7 +645,7 @@ namespace PetaJson
                 if (_tokenizer.CurrentToken == Token.OpenSquare && (type.IsAssignableFrom(typeof(List<object>))))
                 {
                     var container = new List<object>();
-                    ReadArray(() =>
+                    ParseArray(() =>
                     {
                         container.Add(Parse(typeof(Object)));
                     });
@@ -645,18 +660,18 @@ namespace PetaJson
                     return lit;
                 }
 
-                // Call type parser resolver
+                // Call value type resolver
                 if (type.IsValueType)
                 {
-                    var tp = _typeParserResolver(type);
+                    var tp = _parserResolver(type);
                     if (tp != null)
                     {
-                        _typeParsers[type] = tp;
+                        _parsers[type] = tp;
                         return tp(this, type);
                     }
                 }
 
-                // Is it a type we can parse into?
+                // Call reference type resolver
                 if (type.IsClass && type != typeof(object))
                 {
                     var into = Activator.CreateInstance(type);
@@ -664,21 +679,11 @@ namespace PetaJson
                     return into;
                 }
 
+                // Give up
                 throw new InvalidDataException(string.Format("syntax error - unexpected token {0}", _tokenizer.CurrentToken));
             }
 
-            public Type FindGenericInterface(Type type, Type tItf)
-            {
-                foreach (var t in type.GetInterfaces())
-                {
-                    // Is this a generic list?
-                    if (t.IsGenericType && t.GetGenericTypeDefinition() == tItf)
-                        return type;
-                }
-
-                return null;
-            }
-
+            // Parse into an existing object instance
             public void ParseInto(object into)
             {
                 if (into == null)
@@ -688,14 +693,14 @@ namespace PetaJson
 
                 // Existing parse into handler?
                 Action<IJsonReader,object> parseInto;
-                if (_typeIntoParsers.TryGetValue(type, out parseInto))
+                if (_intoParsers.TryGetValue(type, out parseInto))
                 {
                     parseInto(this, into);
                     return;
                 }
 
                 // Generic dictionary?
-                var dictType = FindGenericInterface(type, typeof(IDictionary<,>));
+                var dictType = Utils.FindGenericInterface(type, typeof(IDictionary<,>));
                 if (dictType!=null)
                 {
                     // Get the key and value types
@@ -705,7 +710,7 @@ namespace PetaJson
                     // Parse it
                     IDictionary dict = (IDictionary)into;
                     dict.Clear();
-                    ReadDictionary(key =>
+                    ParseDictionary(key =>
                     {
                         dict.Add(Convert.ChangeType(key, typeKey), Parse(typeValue));
                     });
@@ -714,7 +719,7 @@ namespace PetaJson
                 }
 
                 // Generic list
-                var listType = FindGenericInterface(type, typeof(IList<>));
+                var listType = Utils.FindGenericInterface(type, typeof(IList<>));
                 if (listType!=null)
                 {
                     // Get element type
@@ -723,7 +728,7 @@ namespace PetaJson
                     // Parse it
                     IList list = (IList)into;
                     list.Clear();
-                    ReadArray(() =>
+                    ParseArray(() =>
                     {
                         list.Add(Parse(typeElement));
                     });
@@ -736,7 +741,7 @@ namespace PetaJson
                 if (objDict != null)
                 {
                     objDict.Clear();
-                    ReadDictionary(key =>
+                    ParseDictionary(key =>
                     {
                         objDict[key] = Parse(typeof(Object));
                     });
@@ -748,19 +753,19 @@ namespace PetaJson
                 if (objList!=null)
                 {
                     objList.Clear();
-                    ReadArray(() =>
+                    ParseArray(() =>
                     {
                         objList.Add(Parse(typeof(Object)));
                     });
                     return;
                 }
 
-                // Use reflection?
-                var tw = _typeIntoParserResolver(type);
-                if (tw != null)
+                // Try to resolve a parser
+                var intoParser = _intoParserResolver(type);
+                if (intoParser != null)
                 {
-                    _typeIntoParsers[type] = tw;
-                    tw(this, into);
+                    _intoParsers[type] = intoParser;
+                    intoParser(this, into);
                     return;
                 }
 
@@ -787,17 +792,19 @@ namespace PetaJson
                 _tokenizer.NextToken(); 
             }
 
-            public void ReadDictionary(Action<string> callback)
+            // Parse a dictionary
+            public void ParseDictionary(Action<string> callback)
             {
                 _tokenizer.Skip(Token.OpenBrace);
-
-                ReadDictionaryKeys(key => { callback(key); return true; });
-
+                ParseDictionaryKeys(key => { callback(key); return true; });
                 _tokenizer.Skip(Token.CloseBrace);
             }
 
-            private void ReadDictionaryKeys(Func<string, bool> callback)
+            // Parse dictionary keys, calling callback for each one.  Continues until end of input
+            // or when callback returns false
+            private void ParseDictionaryKeys(Func<string, bool> callback)
             {
+                // End?
                 while (_tokenizer.CurrentToken != Token.CloseBrace)
                 {
                     // Parse the key
@@ -814,21 +821,23 @@ namespace PetaJson
                     {
                         throw new InvalidDataException("syntax error, expected string literal or identifier");
                     }
-
                     _tokenizer.NextToken();
                     _tokenizer.Skip(Token.Colon);
 
+                    // Remember current position
                     var pos = _tokenizer.CurrentTokenPosition;
 
+                    // Call the callback, quit if cancelled
                     if (!callback(key))
                         return;
 
-                    if (pos.Line==_tokenizer.CurrentTokenPosition.Line && pos.Offset == _tokenizer.CurrentTokenPosition.Offset)
+                    // If the callback didn't read anything from the tokenizer, then skip it ourself
+                    if (pos.Line == _tokenizer.CurrentTokenPosition.Line && pos.Offset == _tokenizer.CurrentTokenPosition.Offset)
                     {
-                        // The callback didn't handle the key, so skip the value
                         Parse(typeof(object));
                     }
 
+                    // Separating/trailing comma
                     if (_tokenizer.SkipIf(Token.Comma))
                     {
                         if ((_options & JsonOptions.StrictParser) != 0 && _tokenizer.CurrentToken == Token.CloseBrace)
@@ -837,11 +846,14 @@ namespace PetaJson
                         }
                         continue;
                     }
+
+                    // End
                     break;
                 }
             }
 
-            public void ReadArray(Action callback)
+            // Parse an array
+            public void ParseArray(Action callback)
             {
                 _tokenizer.Skip(Token.OpenSquare);
 
@@ -863,10 +875,11 @@ namespace PetaJson
                 _tokenizer.Skip(Token.CloseSquare);
             }
 
-            public static Dictionary<Type, Func<IJsonReader, Type, object>> _typeParsers = new Dictionary<Type, Func<IJsonReader, Type, object>>();
-            public static Dictionary<Type, Action<IJsonReader, object>> _typeIntoParsers = new Dictionary<Type, Action<IJsonReader, object>>();
-            public static Func<Type, Action<IJsonReader, object>> _typeIntoParserResolver;
-            public static Func<Type, Func<IJsonReader, Type, object>> _typeParserResolver;
+            // Yikes!
+            public static Func<Type, Action<IJsonReader, object>> _intoParserResolver;
+            public static Func<Type, Func<IJsonReader, Type, object>> _parserResolver;
+            public static Dictionary<Type, Func<IJsonReader, Type, object>> _parsers = new Dictionary<Type, Func<IJsonReader, Type, object>>();
+            public static Dictionary<Type, Action<IJsonReader, object>> _intoParsers = new Dictionary<Type, Action<IJsonReader, object>>();
             public static Dictionary<Type, Func<IJsonReader, string, object>> _typeFactories = new Dictionary<Type, Func<IJsonReader, string, object>>();
         }
 
@@ -874,36 +887,26 @@ namespace PetaJson
         {
             static Writer()
             {
-                _typeWriterResolver = ResolveTypeWriter;
+                _formatterResolver = ResolveFormatter;
 
-                // Strings
-                _typeWriters.Add(typeof(string), (w, o) => w.WriteStringLiteral((string)o));
-                _typeWriters.Add(typeof(char), (w, o) => w.WriteStringLiteral(((char)o).ToString()));
-
-                // Boolean
-                _typeWriters.Add(typeof(bool), (w, o) => w.WriteRaw(((bool)o) ? "true" : "false"));
-
-                // Integer
+                // Register standard formatters
+                _formatters.Add(typeof(string), (w, o) => w.WriteStringLiteral((string)o));
+                _formatters.Add(typeof(char), (w, o) => w.WriteStringLiteral(((char)o).ToString()));
+                _formatters.Add(typeof(bool), (w, o) => w.WriteRaw(((bool)o) ? "true" : "false"));
                 Action<IJsonWriter, object> convertWriter = (w, o) => w.WriteRaw((string)Convert.ChangeType(o, typeof(string), System.Globalization.CultureInfo.InvariantCulture));
-                _typeWriters.Add(typeof(int), convertWriter);
-                _typeWriters.Add(typeof(uint), convertWriter);
-                _typeWriters.Add(typeof(long), convertWriter);
-                _typeWriters.Add(typeof(ulong), convertWriter);
-                _typeWriters.Add(typeof(short), convertWriter);
-                _typeWriters.Add(typeof(ushort), convertWriter);
-                _typeWriters.Add(typeof(decimal), convertWriter);
-                _typeWriters.Add(typeof(byte), convertWriter);
-                _typeWriters.Add(typeof(sbyte), convertWriter);
-
-                // Date
-                _typeWriters.Add(typeof(DateTime), (w, o) => convertWriter(w, Utils.ToUnixMilliseconds((DateTime)o)));
-
-                // Floating point
-                _typeWriters.Add(typeof(float), (w, o) => w.WriteRaw(((float)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
-                _typeWriters.Add(typeof(double), (w, o) => w.WriteRaw(((double)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
-
-                // Byte array
-                _typeWriters.Add(typeof(byte[]), (w, o) =>
+                _formatters.Add(typeof(int), convertWriter);
+                _formatters.Add(typeof(uint), convertWriter);
+                _formatters.Add(typeof(long), convertWriter);
+                _formatters.Add(typeof(ulong), convertWriter);
+                _formatters.Add(typeof(short), convertWriter);
+                _formatters.Add(typeof(ushort), convertWriter);
+                _formatters.Add(typeof(decimal), convertWriter);
+                _formatters.Add(typeof(byte), convertWriter);
+                _formatters.Add(typeof(sbyte), convertWriter);
+                _formatters.Add(typeof(DateTime), (w, o) => convertWriter(w, Utils.ToUnixMilliseconds((DateTime)o)));
+                _formatters.Add(typeof(float), (w, o) => w.WriteRaw(((float)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+                _formatters.Add(typeof(double), (w, o) => w.WriteRaw(((double)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+                _formatters.Add(typeof(byte[]), (w, o) =>
                 {
                     w.WriteRaw("\"");
                     w.WriteRaw(Convert.ToBase64String((byte[])o));
@@ -911,10 +914,10 @@ namespace PetaJson
                 });
             }
 
-            public static Dictionary<Type, Action<IJsonWriter, object>> _typeWriters = new Dictionary<Type, Action<IJsonWriter, object>>();
-            public static Func<Type, Action<IJsonWriter, object>> _typeWriterResolver;
+            public static Func<Type, Action<IJsonWriter, object>> _formatterResolver;
+            public static Dictionary<Type, Action<IJsonWriter, object>> _formatters = new Dictionary<Type, Action<IJsonWriter, object>>();
 
-            static Action<IJsonWriter, object> ResolveTypeWriter(Type type)
+            static Action<IJsonWriter, object> ResolveFormatter(Type type)
             {
                 var ri = ReflectionInfo.GetReflectionInfo(type);
                 if (ri != null)
@@ -931,14 +934,14 @@ namespace PetaJson
                 _options = options;
             }
 
-            TextWriter _writer;
+            private TextWriter _writer;
+            private int IndentLevel;
+            private bool _atStartOfLine;
+            private bool _needElementSeparator = false;
+            private JsonOptions _options;
+            private char _currentBlockKind = '\0';
 
-            public int IndentLevel;
-            bool _atStartOfLine;
-            bool _needElementSeparator = false;
-            JsonOptions _options;
-            char _currentBlockKind = '\0';
-
+            // Move to the next line
             public void NextLine()
             {
                 if (_atStartOfLine)
@@ -952,6 +955,7 @@ namespace PetaJson
                 _atStartOfLine = true;
             }
 
+            // Start the next element, writing separators and white space
             void NextElement()
             {
                 if (_needElementSeparator)
@@ -970,6 +974,7 @@ namespace PetaJson
                 _needElementSeparator = true;
             }
 
+            // Write next array element
             public void WriteElement()
             {
                 if (_currentBlockKind != '[')
@@ -977,6 +982,7 @@ namespace PetaJson
                 NextElement();
             }
 
+            // Write next dictionary key
             public void WriteKey(string key)
             {
                 if (_currentBlockKind != '{')
@@ -986,6 +992,7 @@ namespace PetaJson
                 WriteRaw(((_options & JsonOptions.WriteWhitespace) != 0) ? ": " : ":");
             }
 
+            // Write an already escaped dictionary key
             public void WriteKeyNoEscaping(string key)
             {
                 if (_currentBlockKind != '{')
@@ -997,14 +1004,15 @@ namespace PetaJson
                 WriteRaw(((_options & JsonOptions.WriteWhitespace) != 0) ? ": " : ":");
             }
 
+            // Write anything
             public void WriteRaw(string str)
             {
                 _atStartOfLine = false;
                 _writer.Write(str);
             }
 
+            // Write a string, escaping as necessary
             static char[] _charsToEscape = new char[] { '\"', '\r', '\n', '\t', '\f', '\0', '\\', '\'' };
-
             public void WriteStringLiteral(string str)
             {
                 _writer.Write("\"");
@@ -1037,30 +1045,8 @@ namespace PetaJson
                 _writer.Write("\"");
             }
 
-
-            public void WriteStringLiteralX(string str)
-            {
-                _writer.Write("\"");
-
-                foreach (var ch in str)
-                {
-                    switch (ch)
-                    {
-                        case '\"': _writer.Write("\\\""); break;
-                        case '\r': _writer.Write("\\r"); break;
-                        case '\n': _writer.Write("\\n"); break;
-                        case '\t': _writer.Write("\\t"); break;
-                        case '\0': _writer.Write("\\0"); break;
-                        case '\\': _writer.Write("\\\\"); break;
-                        case '\'': _writer.Write("\\'"); break;
-                        default: _writer.Write(ch); break;
-                    }
-                }
-
-                _writer.Write("\"");
-            }
-
-            void WriteBlock(string open, string close, Action callback)
+            // Write an array or dictionary block
+            private void WriteBlock(string open, string close, Action callback)
             {
                 var prevBlockKind = _currentBlockKind;
                 _currentBlockKind = open[0];
@@ -1085,16 +1071,19 @@ namespace PetaJson
                 _currentBlockKind = prevBlockKind;
             }
 
+            // Write an array
             public void WriteArray(Action callback)
             {
                 WriteBlock("[", "]", callback);
             }
 
+            // Write a dictionary
             public void WriteDictionary(Action callback)
             {
                 WriteBlock("{", "}", callback);
             }
 
+            // Write any value
             public void WriteValue(object value)
             {
                 // Special handling for null
@@ -1113,7 +1102,7 @@ namespace PetaJson
 
                 // Look up type writer
                 Action<IJsonWriter, object> typeWriter;
-                if (_typeWriters.TryGetValue(type, out typeWriter))
+                if (_formatters.TryGetValue(type, out typeWriter))
                 {
                     // Write it
                     typeWriter(this, value);
@@ -1157,45 +1146,54 @@ namespace PetaJson
                     return;
                 }
 
-                // Try using reflection
-                var tw = _typeWriterResolver(type);
-                if (tw != null)
+                // Resolve a formatter
+                var formatter = _formatterResolver(type);
+                if (formatter != null)
                 {
-                    _typeWriters[type] = tw;
-                    tw(this, value);
+                    _formatters[type] = formatter;
+                    formatter(this, value);
                     return;
                 }
 
-                // What the?
+                // Give up
                 throw new InvalidDataException(string.Format("Don't know how to write '{0}' to json", value.GetType()));
             }
         }
 
+        // Information about a field or property found through reflection
         public class JsonMemberInfo
         {
+            // The Json key for this member
             public string JsonKey;
+
+            // True if should keep existing instance (reference types only)
             public bool KeepInstance;
 
+            // Reflected member info
             MemberInfo _mi;
             public MemberInfo Member
             {
                 get { return _mi; }
                 set
                 {
+                    // Store it
                     _mi = value;
+
+                    // Also create getters and setters
                     if (_mi is PropertyInfo)
                     {
-                        GetValue = CreateGetter((PropertyInfo)_mi);
-                        SetValue = CreateSetter((PropertyInfo)_mi);
+                        GetValue = (obj) => ((PropertyInfo)_mi).GetValue(obj, null);
+                        SetValue = (obj, val) => ((PropertyInfo)_mi).SetValue(obj, val, null);
                     }
                     else
                     {
-                        GetValue = CreateGetter((FieldInfo)_mi);
-                        SetValue = CreateSetter((FieldInfo)_mi);
+                        GetValue = ((FieldInfo)_mi).GetValue;
+                        SetValue = ((FieldInfo)_mi).SetValue;
                     }
                 }
             }
 
+            // Member type
             public Type MemberType
             {
                 get
@@ -1211,21 +1209,21 @@ namespace PetaJson
                 }
             }
 
+            // Get/set helpers
             public Action<object, object> SetValue;
             public Func<object, object> GetValue;
-
-            public static Action<object, object> CreateSetter(PropertyInfo pi) { return (obj, val) => pi.SetValue(obj, val, null); }
-            public static Action<object, object> CreateSetter(FieldInfo fi) { return fi.SetValue; }
-            public static Func<object, object> CreateGetter(PropertyInfo pi) { return (obj) => pi.GetValue(obj, null); }
-            public static Func<object, object> CreateGetter(FieldInfo fi) { return fi.GetValue; }
         }
 
+        // Stores reflection info about a type
         public class ReflectionInfo
         {
+            // List of members to be serialized
             public List<JsonMemberInfo> Members;
 
+            // Cache of these ReflectionInfos's
             static Dictionary<Type, ReflectionInfo> _cache = new Dictionary<Type, ReflectionInfo>();
 
+            // Write one of these types
             public void Write(IJsonWriter w, object val)
             {
                 w.WriteDictionary(() =>
@@ -1246,19 +1244,17 @@ namespace PetaJson
                 });
             }
 
+            // Read one of these types.
+            // NB: Although PetaJson.JsonParseInto only works on reference type, when using reflection
+            //     it also works for value types so we use the one method for both
             public void ParseInto(IJsonReader r, object into)
             {
                 var loading = into as IJsonLoading;
+                if (loading != null)
+                    loading.OnJsonLoading(r);
 
-                r.ReadDictionary(key =>
+                r.ParseDictionary(key =>
                 {
-
-                    if (loading != null)
-                    {
-                        loading.OnJsonLoading(r);
-                        loading = null;
-                    }
-
                     ParseFieldOrProperty(r, into, key);
                 });
 
@@ -1291,18 +1287,19 @@ namespace PetaJson
                 return false;
             }
 
+            // Parse a value from IJsonReader into an object instance
             public void ParseFieldOrProperty(IJsonReader r, object into, string key)
             {
+                // IJsonLoadField
                 var lf = into as IJsonLoadField;
-                if (lf != null)
-                {
-                    if (lf.OnJsonField(r, key))
-                        return;
-                }
+                if (lf != null && lf.OnJsonField(r, key))
+                    return;
 
+                // Find member
                 JsonMemberInfo jmi;
                 if (FindMemberInfo(key, out jmi))
                 {
+                    // Try to keep existing instance
                     if (jmi.KeepInstance)
                     {
                         var subInto = jmi.GetValue(into);
@@ -1313,12 +1310,14 @@ namespace PetaJson
                         }
                     }
 
+                    // Parse and set
                     var val = r.Parse(jmi.MemberType);
                     jmi.SetValue(into, val);
                     return;
                 }
             }
 
+            // Get the reflection info for a specified type
             public static ReflectionInfo GetReflectionInfo(Type type)
             {
                 // Already created?
@@ -1330,7 +1329,7 @@ namespace PetaJson
                 bool typeMarked = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().Any();
 
                 // Do any members have a [Json] attribute
-                bool anyFieldsMarked = GetAllFieldsAndProperties(type).Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
+                bool anyFieldsMarked = Utils.GetAllFieldsAndProperties(type).Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
 
                 // Should we serialize all public methods?
                 bool serializeAllPublics = typeMarked || !anyFieldsMarked;
@@ -1355,7 +1354,7 @@ namespace PetaJson
                     }
 
                     // Serialize all publics?
-                    if (serializeAllPublics && IsPublic(mi))
+                    if (serializeAllPublics && Utils.IsPublic(mi))
                     {
                         return new JsonMemberInfo()
                         {
@@ -1369,15 +1368,59 @@ namespace PetaJson
 
                 // Cache it
                 _cache[type] = ri;
-
                 return ri;
             }
 
-            static bool IsPublic(MemberInfo mi)
+            public static ReflectionInfo CreateReflectionInfo(Type type, Func<MemberInfo, JsonMemberInfo> callback)
+            {
+                // Work out properties and fields
+                var members = Utils.GetAllFieldsAndProperties(type).Select(x => callback(x)).Where(x => x != null).ToList();
+
+                // Anything with KeepInstance must be a reference type
+                var invalid = members.FirstOrDefault(x => x.KeepInstance && x.MemberType.IsValueType);
+                if (invalid!=null)
+                {
+                    throw new InvalidOperationException(string.Format("KeepInstance=true can only be applied to reference types ({0}.{1})", type.FullName, invalid.Member));
+                }
+
+                // Must have some members
+                if (!members.Any())
+                    return null;
+
+                // Create reflection info
+                return new ReflectionInfo() { Members = members };
+            }
+        }
+
+        internal static class Utils
+        {
+            // Get all fields and properties of a type
+            public static IEnumerable<MemberInfo> GetAllFieldsAndProperties(Type t)
+            {
+                if (t == null)
+                    return Enumerable.Empty<FieldInfo>();
+
+                BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+                return t.GetMembers(flags).Where(x => x is FieldInfo || x is PropertyInfo).Concat(GetAllFieldsAndProperties(t.BaseType));
+            }
+
+            public static Type FindGenericInterface(Type type, Type tItf)
+            {
+                foreach (var t in type.GetInterfaces())
+                {
+                    // Is this a generic list?
+                    if (t.IsGenericType && t.GetGenericTypeDefinition() == tItf)
+                        return type;
+                }
+
+                return null;
+            }
+
+            public static bool IsPublic(MemberInfo mi)
             {
                 // Public field
                 var fi = mi as FieldInfo;
-                if (fi!=null)
+                if (fi != null)
                     return fi.IsPublic;
 
                 // Public property
@@ -1392,48 +1435,6 @@ namespace PetaJson
                 return false;
             }
 
-            public static ReflectionInfo CreateReflectionInfo(Type type, Func<MemberInfo, JsonMemberInfo> callback)
-            {
-                // Already created?
-                ReflectionInfo existing;
-                if (_cache.TryGetValue(type, out existing))
-                    return existing;
-
-                // Work out properties and fields
-                var members = GetAllFieldsAndProperties(type).Select(x => callback(x)).Where(x => x != null).ToList();
-
-                var invalid = members.FirstOrDefault(x => x.KeepInstance && x.MemberType.IsValueType);
-                if (invalid!=null)
-                {
-                    throw new InvalidOperationException(string.Format("KeepInstance=true can only be applied to reference types ({0}.{1})", type.FullName, invalid.Member));
-                }
-
-                // Must have some members
-                if (!members.Any())
-                    return null;
-
-                // Create reflection info
-                var ri = new ReflectionInfo()
-                {
-                    Members = members,
-                };
-
-                return ri;
-            }
-
-            static IEnumerable<MemberInfo> GetAllFieldsAndProperties(Type t)
-            {
-                if (t == null)
-                    return Enumerable.Empty<FieldInfo>();
-
-                BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-                return t.GetMembers(flags).Where(x => x is FieldInfo || x is PropertyInfo).Concat(GetAllFieldsAndProperties(t.BaseType));
-            }
-
-        }
-
-        internal static class Utils
-        {
             public static long ToUnixMilliseconds(DateTime This)
             {
                 return (long)This.Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
@@ -1451,29 +1452,25 @@ namespace PetaJson
             public Tokenizer(TextReader r, JsonOptions options)
             {
                 _underlying = r;
-                FillBuffer();
-
                 _options = options;
-
-                // Load up
+                FillBuffer();
                 NextChar();
                 NextToken();
             }
 
-            JsonOptions _options;
-            StringBuilder _sb = new StringBuilder();
+            private JsonOptions _options;
+            private StringBuilder _sb = new StringBuilder();
+            private TextReader _underlying;
+            private char[] _buf = new char[4096];
+            private int _pos;
+            private int _bufUsed;
+            private StringBuilder _rewindBuffer;
+            private int _rewindBufferPos;
+            private JsonLineOffset _currentCharPos;
+            private char _currentChar;
+            private Stack<ReaderState> _bookmarks = new Stack<ReaderState>();
 
-            TextReader _underlying;
-            char[] _buf = new char[4096];
-            int _pos;
-            int _bufUsed;
-            StringBuilder _rewindBuffer;
-            int _rewindBufferPos;
-
-            JsonLineOffset _currentCharPos;
-            JsonLineOffset CurrentTokenPos;
-            char _currentChar;
-            char _pendingChar;
+            public JsonLineOffset CurrentTokenPosition;
             public Token CurrentToken;
             public LiteralKind LiteralKind;
             public string String;
@@ -1519,47 +1516,41 @@ namespace PetaJson
                 }
             }
 
-            // this object represents the entire state of the reader
-            // which when combined with the RewindableTextReader allows
-            // use to rewind to an arbitrary point in the token stream
+            // This object represents the entire state of the reader and is used for rewind
             struct ReaderState
             {
                 public ReaderState(Tokenizer tokenizer)
                 {
                     _currentCharPos = tokenizer._currentCharPos;
-                    CurrentTokenPos = tokenizer.CurrentTokenPos;
                     _currentChar = tokenizer._currentChar;
-                    _pendingChar = tokenizer._pendingChar;
-                    CurrentToken = tokenizer.CurrentToken;
                     _string = tokenizer.String;
                     _literalKind = tokenizer.LiteralKind;
                     _rewindBufferPos = tokenizer._rewindBufferPos;
+                    _currentTokenPos = tokenizer.CurrentTokenPosition;
+                    _currentToken = tokenizer.CurrentToken;
                 }
 
                 public void Apply(Tokenizer tokenizer)
                 {
                     tokenizer._currentCharPos = _currentCharPos;
-                    tokenizer.CurrentTokenPos = CurrentTokenPos;
                     tokenizer._currentChar = _currentChar;
-                    tokenizer._pendingChar = _pendingChar;
-                    tokenizer.CurrentToken = CurrentToken;
+                    tokenizer._rewindBufferPos = _rewindBufferPos;
+                    tokenizer.CurrentToken = _currentToken;
+                    tokenizer.CurrentTokenPosition = _currentTokenPos;
                     tokenizer.String = _string;
                     tokenizer.LiteralKind = _literalKind;
-                    tokenizer._rewindBufferPos = _rewindBufferPos;
                 }
 
-                public JsonLineOffset _currentCharPos;
-                public JsonLineOffset CurrentTokenPos;
-                public char _currentChar;
-                public char _pendingChar;
-                public Token CurrentToken;
-                public LiteralKind _literalKind;
-                public string _string;
-                public int _rewindBufferPos;
+                private JsonLineOffset _currentCharPos;
+                private JsonLineOffset _currentTokenPos;
+                private char _currentChar;
+                private Token _currentToken;
+                private LiteralKind _literalKind;
+                private string _string;
+                private int _rewindBufferPos;
             }
 
-            Stack<ReaderState> _bookmarks = new Stack<ReaderState>();
-
+            // Create a rewind bookmark
             public void CreateBookmark()
             {
                 _bookmarks.Push(new ReaderState(this));
@@ -1570,6 +1561,7 @@ namespace PetaJson
                 }
             }
 
+            // Discard bookmark
             public void DiscardBookmark()
             {
                 _bookmarks.Pop();
@@ -1580,17 +1572,22 @@ namespace PetaJson
                 }
             }
 
+            // Rewind to a bookmark
             public void RewindToBookmark()
             {
                 _bookmarks.Pop().Apply(this);
             }
 
+            // Fill buffer by reading from underlying TextReader
             void FillBuffer()
             {
                 _bufUsed = _underlying.Read(_buf, 0, _buf.Length);
                 _pos = 0;
             }
 
+            // Get the next character from the input stream
+            // (this function could be extracted into a few different methods, but is mostly inlined
+            //  for performance - yes it makes a difference)
             public char NextChar()
             {
                 if (_rewindBuffer == null)
@@ -1630,10 +1627,13 @@ namespace PetaJson
                 }
             }
 
+            // Read the next token from the input stream
+            // (Mostly inline for performance)
             public void NextToken()
             {
                 while (true)
                 {
+                    // Skip whitespace and handle line numbers
                     while (true)
                     {
                         if (_currentChar == '\r')
@@ -1665,93 +1665,52 @@ namespace PetaJson
                         else
                             break;
                     }
+                    
+                    // Remember position of token
+                    CurrentTokenPosition = _currentCharPos;
 
-                    CurrentTokenPos = _currentCharPos;
-
-                    if (IsIdentifierLeadChar(_currentChar))
-                    {
-                        _sb.Length = 0;
-                        while (IsIdentifierChar(_currentChar))
-                        {
-                            _sb.Append(_currentChar);
-                            NextChar();
-                        }
-
-                        String = _sb.ToString();
-                        switch (String)
-                        {
-                            case "true":
-                                LiteralKind = LiteralKind.True;
-                                CurrentToken =  Token.Literal;
-                                break;
-
-                            case "false":
-                                LiteralKind = LiteralKind.False;
-                                CurrentToken =  Token.Literal;
-                                break;
-
-                            case "null":
-                                LiteralKind = LiteralKind.Null;
-                                CurrentToken =  Token.Literal;
-                                break;
-
-                            default:
-                                CurrentToken =  Token.Identifier;
-                                break;
-                        }
-                        return;
-                    }
-
-                    if (char.IsDigit(_currentChar) || _currentChar == '-')
-                    {
-                        TokenizeNumber();
-                        CurrentToken =  Token.Literal;
-                        return;
-                    }
-
-
+                    // Handle common characters first
                     switch (_currentChar)
                     {
                         case '/':
-                            if ((_options & JsonOptions.StrictParser)!=0)
+                            // Comments not support in strict mode
+                            if ((_options & JsonOptions.StrictParser) != 0)
                             {
-                                // Comments not support in strict mode
                                 throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
                             }
-                            else
+
+                            // Process comment
+                            NextChar();
+                            switch (_currentChar)
                             {
-                                NextChar();
-                                switch (_currentChar)
-                                {
-                                    case '/':
+                                case '/':
+                                    NextChar();
+                                    while (_currentChar!='\0' && _currentChar != '\r' && _currentChar != '\n')
+                                    {
                                         NextChar();
-                                        while (_currentChar!='\0' && _currentChar != '\r' && _currentChar != '\n')
+                                    }
+                                    break;
+
+                                case '*':
+                                    bool endFound = false;
+                                    while (!endFound && _currentChar!='\0')
+                                    {
+                                        if (_currentChar == '*')
                                         {
                                             NextChar();
-                                        }
-                                        break;
-
-                                    case '*':
-                                        bool endFound = false;
-                                        while (!endFound && _currentChar!='\0')
-                                        {
-                                            if (_currentChar == '*')
+                                            if (_currentChar == '/')
                                             {
-                                                NextChar();
-                                                if (_currentChar == '/')
-                                                {
-                                                    endFound = true;
-                                                }
+                                                endFound = true;
                                             }
-                                            NextChar();
                                         }
-                                        break;
+                                        NextChar();
+                                    }
+                                    break;
 
-                                    default:
-                                        throw new InvalidDataException("syntax error - unexpected character after slash");
-                                }
+                                default:
+                                    throw new InvalidDataException("syntax error - unexpected character after slash");
                             }
-                            break;
+                            continue;
 
                         case '\"':
                         case '\'':
@@ -1807,10 +1766,6 @@ namespace PetaJson
                             throw new InvalidDataException("syntax error - unterminated string literal");
                         }
 
-                        case '\0':
-                            CurrentToken =  Token.EOF;
-                            return;
-
                         case '{': CurrentToken =  Token.OpenBrace; NextChar(); return;
                         case '}': CurrentToken =  Token.CloseBrace; NextChar(); return;
                         case '[': CurrentToken =  Token.OpenSquare; NextChar(); return;
@@ -1819,18 +1774,64 @@ namespace PetaJson
                         case ':': CurrentToken =  Token.Colon; NextChar(); return;
                         case ';': CurrentToken =  Token.SemiColon; NextChar(); return;
                         case ',': CurrentToken =  Token.Comma; NextChar(); return;
-
-                        default:
-                            throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
+                        case '\0': CurrentToken = Token.EOF; return;
                     }
+
+                    // Number?
+                    if (char.IsDigit(_currentChar) || _currentChar == '-')
+                    {
+                        TokenizeNumber();
+                        return;
+                    }
+
+                    // Identifier?  (checked for after everything else as identifiers are actually quite rare in valid json)
+                    if (Char.IsLetter(_currentChar) || _currentChar == '_' || _currentChar == '$')
+                    {
+                        // Find end of identifier
+                        _sb.Length = 0;
+                        while (Char.IsLetterOrDigit(_currentChar) || _currentChar == '_' || _currentChar == '$')
+                        {
+                            _sb.Append(_currentChar);
+                            NextChar();
+                        }
+                        String = _sb.ToString();
+
+                        // Handle special identifiers
+                        switch (String)
+                        {
+                            case "true":
+                                LiteralKind = LiteralKind.True;
+                                CurrentToken =  Token.Literal;
+                                return;
+
+                            case "false":
+                                LiteralKind = LiteralKind.False;
+                                CurrentToken =  Token.Literal;
+                                return;
+
+                            case "null":
+                                LiteralKind = LiteralKind.Null;
+                                CurrentToken =  Token.Literal;
+                                return;
+                        }
+
+                        CurrentToken =  Token.Identifier;
+                        return;
+                    }
+
+                    // What the?
+                    throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
                 }
             }
 
-            void TokenizeNumber()
+            // Parse a sequence of characters that could make up a valid number
+            // For performance, we don't actually parse it into a number yet.  When using PetaJsonEmit we parse
+            // later, directly into a value type to avoid boxing
+            private void TokenizeNumber()
             {
                 _sb.Length = 0;
 
-                // Leading -
+                // Leading negative sign
                 bool signed = false;
                 if (_currentChar == '-')
                 {
@@ -1839,6 +1840,7 @@ namespace PetaJson
                     NextChar();
                 }
 
+                // Hex prefix?
                 bool hex = false;
                 if (_currentChar == '0')
                 {
@@ -1852,6 +1854,7 @@ namespace PetaJson
                     }
                 }
 
+                // Process characters, but vaguely figure out what type it is
                 bool cont = true;
                 bool fp = false;
                 while (cont)
@@ -1925,12 +1928,14 @@ namespace PetaJson
                     }
                 }
 
-                 if (char.IsLetterOrDigit(_currentChar))
+                if (char.IsLetter(_currentChar))
                     throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _sb.ToString()));
 
-
+                // Setup token
                 String = _sb.ToString();
                 CurrentToken = Token.Literal;
+
+                // Setup literal kind
                 if (fp)
                 {
                     LiteralKind = LiteralKind.FloatingPoint;
@@ -1943,10 +1948,9 @@ namespace PetaJson
                 {
                     LiteralKind = LiteralKind.UnsignedInteger;
                 }
-              
-
             }
 
+            // Check the current token, throw exception if mismatch
             public void Check(Token tokenRequired)
             {
                 if (tokenRequired != CurrentToken)
@@ -1955,13 +1959,14 @@ namespace PetaJson
                 }
             }
 
+            // Skip token which must match
             public void Skip(Token tokenRequired)
             {
                 Check(tokenRequired);
                 NextToken();
             }
 
-
+            // Skip token if it matches
             public bool SkipIf(Token tokenRequired)
             {
                 if (tokenRequired == CurrentToken)
@@ -1970,22 +1975,6 @@ namespace PetaJson
                     return true;
                 }
                 return false;
-            }
-
-
-            public JsonLineOffset CurrentTokenPosition
-            {
-                get { return CurrentTokenPos; }
-            }
-
-            public static bool IsIdentifierChar(char ch)
-            {
-                return Char.IsLetterOrDigit(ch) || ch == '_' || ch == '$';
-            }
-
-            public static bool IsIdentifierLeadChar(char ch)
-            {
-                return Char.IsLetter(ch) || ch == '_' || ch == '$';
             }
         }
     }

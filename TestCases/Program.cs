@@ -42,9 +42,6 @@ namespace TestCases
             object inst = new MyStruct();
 
             fn(inst);
-
-
-            int x = 3;
         }
 
 

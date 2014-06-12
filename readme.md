@@ -27,7 +27,7 @@ Here goes, a 5 minute whirl-wind tour of using PetaJson...
 2. Optionally add "using PetaJson;" clauses as required
 3. That's it
 
-# Setup (performance)
+## Setup (performance)
 
 1. As above + also add PetaJsonEmit.cs to your project
 2. Call PetaJson.JsonEmit.Init() from your startup code

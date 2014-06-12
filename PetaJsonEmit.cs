@@ -13,8 +13,9 @@ namespace PetaJson
     {
         public static void Init()
         {
-            Json.SetTypeFormatterResolver(Internal.Emit.MakeFormatter);
-            Json.SetTypeIntoParserResolver(Internal.Emit.MakeIntoParser);
+            Json.SetFormatterResolver(Internal.Emit.MakeFormatter);
+            Json.SetParserResolver(Internal.Emit.MakeParser);
+            Json.SetIntoParserResolver(Internal.Emit.MakeIntoParser);
         }
     }
 
@@ -22,6 +23,8 @@ namespace PetaJson
     {
         static class Emit
         {
+
+            // Generates a function that when passed an object of specified type, renders it to an IJsonReader
             public static Action<IJsonWriter, object> MakeFormatter(Type type)
             {
                 // Get the reflection info for this type
@@ -39,7 +42,7 @@ namespace PetaJson
                 il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
                 il.Emit(OpCodes.Stloc, locTypedObj);
 
-                // Get Invariant CultureInfo
+                // Get Invariant CultureInfo (since we'll probably be needing this)
                 var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
                 il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
                 il.Emit(OpCodes.Stloc, locInvariant);
@@ -59,12 +62,19 @@ namespace PetaJson
                 // Call IJsonWriting if implemented
                 if (typeof(IJsonWriting).IsAssignableFrom(type))
                 {
-                    il.Emit(OpCodes.Ldloc, locTypedObj);
                     if (type.IsValueType)
-                        il.Emit(OpCodes.Box, type);
-                    il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWriting", new Type[] { typeof(IJsonWriter) }));
+                    {
+                        il.Emit(OpCodes.Ldloca, locTypedObj);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWriting)).TargetMethods[0]);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Ldloc, locTypedObj);
+                        il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWriting", new Type[] { typeof(IJsonWriter) }));
+                    }
                 }
 
                 // Process all members
@@ -98,7 +108,7 @@ namespace PetaJson
                         il.Emit(OpCodes.Ldloc, locTypedObj);
                     }
 
-                    // Work out if we need to the value or it's address on the stack
+                    // Work out if we need the value or it's address on the stack
                     bool NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
                     if (Nullable.GetUnderlyingType(memberType) != null)
                     {
@@ -241,18 +251,23 @@ namespace PetaJson
                 // Call IJsonWritten
                 if (typeof(IJsonWritten).IsAssignableFrom(type))
                 {
-                    il.Emit(OpCodes.Ldloc, locTypedObj);
                     if (type.IsValueType)
-                        il.Emit(OpCodes.Box, type);
-                    il.Emit(OpCodes.Castclass, typeof(IJsonWritten));
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Callvirt, typeof(IJsonWritten).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
+                    {
+                        il.Emit(OpCodes.Ldloca, locTypedObj);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWritten)).TargetMethods[0]);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Ldloc, locTypedObj);
+                        il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
+                    }
                 }
 
                 // Done!
                 il.Emit(OpCodes.Ret);
-
-                // Create delegate to our IL code
                 var impl = (Action<IJsonWriter, object>)method.CreateDelegate(typeof(Action<IJsonWriter, object>));
 
                 // Wrap it in a call to WriteDictionary
@@ -266,8 +281,28 @@ namespace PetaJson
 
             }
 
-            public static Action<IJsonReader, object> MakeIntoParser(Type type)
+            // Pseudo box lets us pass a value type by reference.  Used during 
+            // deserialization of value types.
+            interface IPseudoBox
             {
+                object GetValue();
+            }
+            class PseudoBox<T> : IPseudoBox where T : struct
+            {
+                public T value;
+
+                object IPseudoBox.GetValue()
+                {
+                    return value;
+                }
+            }
+
+
+            // Make a parser for value types
+            public static Func<IJsonReader, Type, object> MakeParser(Type type)
+            {
+                System.Diagnostics.Debug.Assert(type.IsValueType);
+
                 // Get the reflection info for this type
                 var ri = ReflectionInfo.GetReflectionInfo(type);
                 if (ri == null)
@@ -276,13 +311,8 @@ namespace PetaJson
                 // We'll create setters for each property/field
                 var setters = new Dictionary<string, Action<IJsonReader, object>>();
 
-                // These types we'll call <type>.Parse(reader.String) on
-                var numericTypes = new Type[] { 
-                    typeof(int), typeof(uint), typeof(long), typeof(ulong), 
-                    typeof(short), typeof(ushort), typeof(decimal), 
-                    typeof(byte), typeof(sbyte), 
-                    typeof(double), typeof(float)
-                };
+                // Store the value in a pseudo box until it's fully initialized
+                var boxType = typeof(PseudoBox<>).MakeGenericType(type);
 
                 // Process all members
                 foreach (var m in ri.Members)
@@ -294,6 +324,154 @@ namespace PetaJson
                     {
                         continue;
                     }
+                    
+                    // Create a dynamic method that can do the work
+                    var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
+                    var il = method.GetILGenerator();
+
+                    // Load the target
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Castclass, boxType);
+                    il.Emit(OpCodes.Ldflda, boxType.GetField("value"));
+
+                    // Get the value
+                    GenerateGetJsonValue(m, il);
+
+                    // Assign it
+                    if (pi != null)
+                        il.Emit(OpCodes.Call, pi.GetSetMethod());
+                    if (fi != null)
+                        il.Emit(OpCodes.Stfld, fi);
+
+                    // Done
+                    il.Emit(OpCodes.Ret);
+
+                    // Store in the map of setters
+                    setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
+                }
+
+                // Create helpers to invoke the interfaces (this is painful but avoids having to really box 
+                // the value in order to call the interface).
+                Action<object, IJsonReader> invokeLoading = MakeInterfaceCall(type, typeof(IJsonLoading));
+                Action<object, IJsonReader> invokeLoaded = MakeInterfaceCall(type, typeof(IJsonLoaded));
+                Func<object, IJsonReader, string, bool> invokeField = MakeLoadFieldCall(type);
+
+                // Create the parser
+                Func<IJsonReader, Type, object> parser = (reader, Type) =>
+                {
+                    // Create pseudobox (ie: new PseudoBox<Type>)
+                    var box = Activator.CreateInstance(boxType);
+
+                    // Call IJsonLoading
+                    if (invokeLoading != null)
+                        invokeLoading(box, reader);
+
+                    // Read the dictionary
+                    reader.ParseDictionary(key =>
+                    {
+                        // Call IJsonLoadField
+                        if (invokeField != null && invokeField(box, reader, key))
+                            return;
+
+                        // Get a setter and invoke it if found
+                        Action<IJsonReader, object> setter;
+                        if (setters.TryGetValue(key, out setter))
+                        {
+                            setter(reader, box);
+                        }
+                    });
+
+                    // IJsonLoaded
+                    if (invokeLoaded != null)
+                        invokeLoaded(box, reader);
+
+                    // Return the value
+                    return ((IPseudoBox)box).GetValue();
+                };
+
+                // Done
+                return parser;
+            }
+
+            // Helper to make the call to a PsuedoBox value's IJsonLoading or IJsonLoaded
+            static Action<object, IJsonReader> MakeInterfaceCall(Type type, Type tItf)
+            {
+                // Interface supported?
+                if (!tItf.IsAssignableFrom(type))
+                    return null;
+
+                // Resolve the box type
+                var boxType = typeof(PseudoBox<>).MakeGenericType(type);
+
+                // Create method
+                var method = new DynamicMethod("dynamic_invoke_" + tItf.Name, null, new Type[] { typeof(object), typeof(IJsonReader) }, true);
+                var il = method.GetILGenerator();
+
+                // Call interface method
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, boxType);
+                il.Emit(OpCodes.Ldflda, boxType.GetField("value"));
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, type.GetInterfaceMap(tItf).TargetMethods[0]);
+                il.Emit(OpCodes.Ret);
+
+                // Done
+                return (Action<object, IJsonReader>)method.CreateDelegate(typeof(Action<object, IJsonReader>));
+            }
+
+            // Similar to above but for IJsonLoadField
+            static Func<object, IJsonReader, string, bool> MakeLoadFieldCall(Type type)
+            {
+                // Interface supported?
+                var tItf = typeof(IJsonLoadField);
+                if (!tItf.IsAssignableFrom(type))
+                    return null;
+
+                // Resolve the box type
+                var boxType = typeof(PseudoBox<>).MakeGenericType(type);
+
+                // Create method
+                var method = new DynamicMethod("dynamic_invoke_" + tItf.Name, typeof(bool), new Type[] { typeof(object), typeof(IJsonReader), typeof(string) }, true);
+                var il = method.GetILGenerator();
+
+                // Call interface method
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, boxType);
+                il.Emit(OpCodes.Ldflda, boxType.GetField("value"));
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Call, type.GetInterfaceMap(tItf).TargetMethods[0]);
+                il.Emit(OpCodes.Ret);
+
+                // Done
+                return (Func<object, IJsonReader, string, bool>)method.CreateDelegate(typeof(Func<object, IJsonReader, string, bool>));
+            }
+
+            // Create an "into parser" that can parse from IJsonReader into a reference type (ie: a class)
+            public static Action<IJsonReader, object> MakeIntoParser(Type type)
+            {
+                System.Diagnostics.Debug.Assert(!type.IsValueType);
+
+                // Get the reflection info for this type
+                var ri = ReflectionInfo.GetReflectionInfo(type);
+                if (ri == null)
+                    return null;
+
+                // We'll create setters for each property/field
+                var setters = new Dictionary<string, Action<IJsonReader, object>>();
+
+                // Process all members
+                foreach (var m in ri.Members)
+                {
+                    // Ignore write only properties
+                    var pi = m.Member as PropertyInfo;
+                    var fi = m.Member as FieldInfo;
+                    if (pi != null && pi.GetSetMethod() == null)
+                    {
+                        continue;
+                    }
+
+                    // Ignore read only properties that has KeepInstance attribute
                     if (pi != null && pi.GetGetMethod() == null && m.KeepInstance)
                     {
                         continue;
@@ -305,8 +483,9 @@ namespace PetaJson
 
                     // Load the target
                     il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
+                    il.Emit(OpCodes.Castclass, type);
 
+                    // Try to keep existing instance?
                     if (m.KeepInstance)
                     {
                         // Get existing existing instance
@@ -338,89 +517,42 @@ namespace PetaJson
                         il.MarkLabel(lblExistingInstanceNull);
                     }
 
-                    Action<string> callHelper = helperName =>
-                    {
-                        // check we have a string
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod(helperName, new Type[] { typeof(IJsonReader) }));
+                    // Get the value from IJsonReader
+                    GenerateGetJsonValue(m, il);
 
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                    };
-
-                    if (m.MemberType == typeof(string))
-                    {
-                        callHelper("GetLiteralString");
-                    }
-
-                    else if (m.MemberType == typeof(bool))
-                    {
-                        callHelper("GetLiteralBool");
-                    }
-
-                    else if (m.MemberType == typeof(char))
-                    {
-                        callHelper("GetLiteralChar");
-                    }
-
-                    else if (numericTypes.Contains(m.MemberType))
-                    {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralNumber", new Type[] { typeof(IJsonReader) }));
-
-                        // Convert to a string
-                        il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
-                        il.Emit(OpCodes.Call, m.MemberType.GetMethod("Parse", new Type[] { typeof(string), typeof(IFormatProvider) }));
-
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
-                    }
-
-                    else
-                    {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldtoken, m.MemberType);
-                        il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) }));
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("Parse", new Type[] { typeof(Type) }));
-                        il.Emit(m.MemberType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, m.MemberType);
-                    }
-
+                    // Assign it
                     if (pi != null)
-                    {
-                        il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, pi.GetSetMethod());
-                    }
-
+                        il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
                     if (fi != null)
-                    {
                         il.Emit(OpCodes.Stfld, fi);
-                    }
 
+                    // Done
                     il.Emit(OpCodes.Ret);
 
                     // Store the handler in map
                     setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
                 }
 
+
                 // Now create the parseInto delegate
-                bool hasLoading = typeof(IJsonLoading).IsAssignableFrom(type);
-                bool hasLoaded = typeof(IJsonLoaded).IsAssignableFrom(type);
                 Action<IJsonReader, object> parseInto = (reader, obj) =>
                 {
-                    if (hasLoading)
-                    {
-                        ((IJsonLoading)obj).OnJsonLoading(reader);
-                    }
+                    // Call IJsonLoading
+                    var loading = obj as IJsonLoading;
+                    if (loading!=null)
+                        loading.OnJsonLoading(reader);
 
+                    // Cache IJsonLoadField
                     var lf = obj as IJsonLoadField;
 
-                    reader.ReadDictionary(key =>
+                    // Read dictionary keys
+                    reader.ParseDictionary(key =>
                     {
-                        if (lf != null)
-                        {
-                            if (lf.OnJsonField(reader, key))
-                                return;
-                        }
+                        // Call IJsonLoadField
+                        if (lf != null && lf.OnJsonField(reader, key))
+                            return;
 
+                        // Call setters
                         Action<IJsonReader, object> setter;
                         if (setters.TryGetValue(key, out setter))
                         {
@@ -428,40 +560,31 @@ namespace PetaJson
                         }
                     });
 
-                    if (hasLoaded)
-                    {
-                        ((IJsonLoaded)obj).OnJsonLoaded(reader);
-                    }
+                    // Call IJsonLoaded
+                    var loaded = obj as IJsonLoaded;
+                    if (loaded != null)
+                        loaded.OnJsonLoaded(reader);
                 };
 
-                // While we're at it, we might as well create a direct type converter too
-                RegisterParser(type, parseInto);
+                // Since we've created the ParseInto handler, we might as well register
+                // as a Parse handler too.
+                RegisterIntoParser(type, parseInto);
 
                 // Done
                 return parseInto;
             }
 
-            static void RegisterParser(Type type, Action<IJsonReader, object> parseInto)
+            // Registers a ParseInto handler as Parse handler that instantiates the object
+            // and then parses into it.
+            static void RegisterIntoParser(Type type, Action<IJsonReader, object> parseInto)
             {
                 // Create a dynamic method that can do the work
-                var method = new DynamicMethod("dynamic_factory", typeof(object), new Type[] { typeof(IJsonReader), typeof(Action<IJsonReader, object>)}, true);
+                var method = new DynamicMethod("dynamic_factory", typeof(object), new Type[] { typeof(IJsonReader), typeof(Action<IJsonReader, object>) }, true);
                 var il = method.GetILGenerator();
 
                 // Create the new object
                 var locObj = il.DeclareLocal(typeof(object));
-                if (type.IsValueType)
-                {
-                    // Create boxed type
-                    var locTempStruct = il.DeclareLocal(type);
-                    il.Emit(OpCodes.Ldloca, locTempStruct);
-                    il.Emit(OpCodes.Initobj);
-                    il.Emit(OpCodes.Ldloc, locTempStruct);
-                    il.Emit(OpCodes.Box, type);
-                }
-                else
-                {
-                    il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
-                }
+                il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
 
                 il.Emit(OpCodes.Dup);               // For return value
 
@@ -473,7 +596,7 @@ namespace PetaJson
                 il.Emit(OpCodes.Callvirt, typeof(Action<IJsonReader, object>).GetMethod("Invoke"));
                 il.Emit(OpCodes.Ret);
 
-                var factory = (Func<IJsonReader, Action<IJsonReader,object>, object>)method.CreateDelegate(typeof(Func<IJsonReader, Action<IJsonReader, object>, object>));
+                var factory = (Func<IJsonReader, Action<IJsonReader, object>, object>)method.CreateDelegate(typeof(Func<IJsonReader, Action<IJsonReader, object>, object>));
 
                 Json.RegisterParser(type, (reader, type2) =>
                 {
@@ -481,6 +604,68 @@ namespace PetaJson
                 });
             }
 
+            // Generate the MSIL to retrieve a value for a particular field or property from a IJsonReader
+            private static void GenerateGetJsonValue(JsonMemberInfo m, ILGenerator il)
+            {
+                Action<string> generateCallToHelper = helperName =>
+                {
+                    // Call the helper
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Call, typeof(Emit).GetMethod(helperName, new Type[] { typeof(IJsonReader) }));
+
+                    // Move to next token
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                };
+
+                Type[] numericTypes = new Type[] { 
+                    typeof(int), typeof(uint), typeof(long), typeof(ulong), 
+                    typeof(short), typeof(ushort), typeof(decimal), 
+                    typeof(byte), typeof(sbyte), 
+                    typeof(double), typeof(float)
+                };
+
+                if (m.MemberType == typeof(string))
+                {
+                    generateCallToHelper("GetLiteralString");
+                }
+
+                else if (m.MemberType == typeof(bool))
+                {
+                    generateCallToHelper("GetLiteralBool");
+                }
+
+                else if (m.MemberType == typeof(char))
+                {
+                    generateCallToHelper("GetLiteralChar");
+                }
+
+                else if (numericTypes.Contains(m.MemberType))
+                {
+                    // Get raw number string
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Call, typeof(Emit).GetMethod("GetLiteralNumber", new Type[] { typeof(IJsonReader) }));
+
+                    // Convert to a string
+                    il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
+                    il.Emit(OpCodes.Call, m.MemberType.GetMethod("Parse", new Type[] { typeof(string), typeof(IFormatProvider) }));
+
+                    // 
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("NextToken", new Type[] { }));
+                }
+
+                else
+                {
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldtoken, m.MemberType);
+                    il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle", new Type[] { typeof(RuntimeTypeHandle) }));
+                    il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("Parse", new Type[] { typeof(Type) }));
+                    il.Emit(m.MemberType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, m.MemberType);
+                }
+            }
+
+            // Helper to fetch a literal bool from an IJsonReader
             public static bool GetLiteralBool(IJsonReader r)
             {
                 switch (r.GetLiteralKind())
@@ -496,6 +681,7 @@ namespace PetaJson
                 }
             }
 
+            // Helper to fetch a literal character from an IJsonReader
             public static char GetLiteralChar(IJsonReader r)
             {
                 if (r.GetLiteralKind() != LiteralKind.String)
@@ -507,6 +693,7 @@ namespace PetaJson
                 return str[0];
             }
 
+            // Helper to fetch a literal string from an IJsonReader
             public static string GetLiteralString(IJsonReader r)
             {
                 if (r.GetLiteralKind() != LiteralKind.String)
@@ -514,6 +701,7 @@ namespace PetaJson
                 return r.GetLiteralString();
             }
 
+            // Helper to fetch a literal number from an IJsonReader (returns the raw string)
             public static string GetLiteralNumber(IJsonReader r)
             {
                 switch (r.GetLiteralKind())
