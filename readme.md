@@ -24,13 +24,12 @@ Here goes, a 5 minute whirl-wind tour of using PetaJson...
 ## Setup (portable)
 
 1. Add PetaJson.cs to your project
-2. Optionally add "using PetaJson;" clauses as required
-3. That's it
+2. That's it
 
-## Setup (performance)
+Well almost, you'll probably want some `using PetaJson;` clauses and depending on your target platform you might need to define the following symbols in your project to  disable some functionality:
 
-1. As above + also add PetaJsonEmit.cs to your project
-2. Call PetaJson.JsonEmit.Init() from your startup code
+* `PETAJSON_NO_DYNAMIC` - disable support for System.Dynamic.ExpandoObject
+* `PETAJSON_NO_EMIT` - disable use of System.Reflection.Emit (slower, more portable)
 
 ## Generating JSON
 
