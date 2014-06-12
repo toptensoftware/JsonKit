@@ -14,7 +14,7 @@ namespace PetaJson
         public static void Init()
         {
             Json.SetTypeFormatterResolver(Internal.Emit.MakeFormatter);
-            Json.SetTypeIntoParserResolver(Internal.Emit.MakeParser);
+            Json.SetTypeIntoParserResolver(Internal.Emit.MakeIntoParser);
         }
     }
 
@@ -266,11 +266,8 @@ namespace PetaJson
 
             }
 
-            public static Action<IJsonReader, object> MakeParser(Type type)
+            public static Action<IJsonReader, object> MakeIntoParser(Type type)
             {
-                if (type.IsValueType)
-                    throw new NotImplementedException("Value types aren't supported through reflection");
-
                 // Get the reflection info for this type
                 var ri = ReflectionInfo.GetReflectionInfo(type);
                 if (ri == null)
@@ -292,7 +289,12 @@ namespace PetaJson
                 {
                     // Ignore write only properties
                     var pi = m.Member as PropertyInfo;
+                    var fi = m.Member as FieldInfo;
                     if (pi != null && pi.GetSetMethod() == null)
+                    {
+                        continue;
+                    }
+                    if (pi != null && pi.GetGetMethod() == null && m.KeepInstance)
                     {
                         continue;
                     }
@@ -301,14 +303,40 @@ namespace PetaJson
                     var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
                     var il = method.GetILGenerator();
 
-                    if (m.KeepInstance)
-                    {
-                        throw new NotImplementedException("Emit KeepInstance not implemented");
-                    }
-
                     // Load the target
                     il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Castclass, type);
+                    il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
+
+                    if (m.KeepInstance)
+                    {
+                        // Get existing existing instance
+                        il.Emit(OpCodes.Dup);
+                        if (pi != null)
+                            il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
+                        else
+                            il.Emit(OpCodes.Ldfld, fi);
+
+                        var existingInstance = il.DeclareLocal(m.MemberType);
+                        var lblExistingInstanceNull = il.DefineLabel();
+
+                        // Keep a copy of the existing instance in a locale
+                        il.Emit(OpCodes.Dup);
+                        il.Emit(OpCodes.Stloc, existingInstance);
+
+                        // Compare to null
+                        il.Emit(OpCodes.Ldnull);
+                        il.Emit(OpCodes.Ceq);
+                        il.Emit(OpCodes.Brtrue_S, lblExistingInstanceNull);
+
+                        il.Emit(OpCodes.Ldarg_0);                       // reader
+                        il.Emit(OpCodes.Ldloc, existingInstance);       // into
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonReader).GetMethod("ParseInto", new Type[] { typeof(Object) }));
+
+                        il.Emit(OpCodes.Pop);       // Clean up target left on stack (1)
+                        il.Emit(OpCodes.Ret);
+
+                        il.MarkLabel(lblExistingInstanceNull);
+                    }
 
                     Action<string> callHelper = helperName =>
                     {
@@ -359,10 +387,9 @@ namespace PetaJson
 
                     if (pi != null)
                     {
-                        il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
+                        il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, pi.GetSetMethod());
                     }
 
-                    var fi = m.Member as FieldInfo;
                     if (fi != null)
                     {
                         il.Emit(OpCodes.Stfld, fi);
@@ -421,9 +448,23 @@ namespace PetaJson
                 var il = method.GetILGenerator();
 
                 // Create the new object
-                var locObj = il.DeclareLocal(type);
-                il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
-                il.Emit(OpCodes.Dup);
+                var locObj = il.DeclareLocal(typeof(object));
+                if (type.IsValueType)
+                {
+                    // Create boxed type
+                    var locTempStruct = il.DeclareLocal(type);
+                    il.Emit(OpCodes.Ldloca, locTempStruct);
+                    il.Emit(OpCodes.Initobj);
+                    il.Emit(OpCodes.Ldloc, locTempStruct);
+                    il.Emit(OpCodes.Box, type);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
+                }
+
+                il.Emit(OpCodes.Dup);               // For return value
+
                 il.Emit(OpCodes.Stloc, locObj);
 
                 il.Emit(OpCodes.Ldarg_1);           // parseinto delegate

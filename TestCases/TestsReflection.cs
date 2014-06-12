@@ -45,6 +45,29 @@ namespace TestCases
         public string Prop2 { get; set; }
     }
 
+    [Json]
+    class InstanceObject
+    {
+        public int IntVal1;
+
+        [JsonExclude] public int IntVal2;
+
+    }
+
+    [Json]
+    class ModelKeepInstance
+    {
+        [Json(KeepInstance=true)]
+        public InstanceObject InstObj;
+    }
+
+    [Json]
+    struct ModelStruct
+    {
+        public int IntField;
+        public int IntProp { get; set; }
+    }
+
     [TestFixture]
     public class TestsReflection
     {
@@ -126,6 +149,76 @@ namespace TestCases
             Assert.DoesNotContain(json, "field2");
             Assert.Contains(json, "Prop1");
             Assert.DoesNotContain(json, "prop2");
+        }
+
+        [Test]
+        public void KeepInstanceTest1()
+        {
+            // Create model and save it
+            var ki = new ModelKeepInstance();
+            ki.InstObj = new InstanceObject();
+            ki.InstObj.IntVal1 = 1;
+            ki.InstObj.IntVal2 = 2;
+            var json = Json.Format(ki);
+
+            // Update the kept instance object
+            ki.InstObj.IntVal1 = 11;
+            ki.InstObj.IntVal2 = 12;
+
+            // Reload
+            var oldInst = ki.InstObj;
+            Json.ParseInto(json, ki);
+
+            // Check object instance kept
+            Assert.AreSame(oldInst, ki.InstObj);
+
+            // Check json properties updated, others not
+            Assert.AreEqual(ki.InstObj.IntVal1, 1);
+            Assert.AreEqual(ki.InstObj.IntVal2, 12);
+        }
+
+        [Test]
+        public void KeepInstanceTest2()
+        {
+            // Create model and save it
+            var ki = new ModelKeepInstance();
+            ki.InstObj = new InstanceObject();
+            ki.InstObj.IntVal1 = 1;
+            ki.InstObj.IntVal2 = 2;
+            var json = Json.Format(ki);
+
+            // Update the kept instance object
+            ki.InstObj = null;
+
+            // Reload
+            Json.ParseInto(json, ki);
+
+            // Check object instance kept
+            Assert.IsNotNull(ki.InstObj);
+
+            // Check json properties updated, others not
+            Assert.AreEqual(ki.InstObj.IntVal1, 1);
+            Assert.AreEqual(ki.InstObj.IntVal2, 0);
+        }
+
+        [Test]
+        public void StructTest()
+        {
+            var o = new ModelStruct();
+            o.IntField = 23;
+            o.IntProp = 24;
+
+            var json = Json.Format(o);
+            Assert.Contains(json, "23");
+            Assert.Contains(json, "24");
+
+            var o2 = Json.Parse<ModelStruct>(json);
+            Assert.AreEqual(o2.IntField, 23);
+            Assert.AreEqual(o2.IntProp, 24);
+
+            // Test parseInto on a value type not supported
+            var o3 = new ModelStruct();
+            Assert.Throws<InvalidOperationException>(() => Json.ParseInto(json, o3));
         }
     }
 }

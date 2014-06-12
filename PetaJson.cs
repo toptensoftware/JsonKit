@@ -106,6 +106,11 @@ namespace PetaJson
         // Parse from text reader into an already instantied object
         public static void ParseInto(TextReader r, Object into, JsonOptions options = JsonOptions.None)
         {
+            if (into == null)
+                throw new NullReferenceException();
+            if (into.GetType().IsValueType)
+                throw new InvalidOperationException("Can't ParseInto a value type");
+
             Internal.Reader reader = null;
             try
             {
@@ -224,6 +229,11 @@ namespace PetaJson
         public static void SetTypeFormatterResolver(Func<Type, Action<IJsonWriter, object>> resolver)
         {
             Internal.Writer._typeWriterResolver = resolver;
+        }
+
+        public static void SetTypeParserResolver(Func<Type, Func<IJsonReader, Type, object>> resolver)
+        {
+            Internal.Reader._typeParserResolver = resolver;
         }
 
         public static void SetTypeIntoParserResolver(Func<Type, Action<IJsonReader, object>> resolver)
@@ -424,6 +434,7 @@ namespace PetaJson
             static Reader()
             {
                 _typeIntoParserResolver = ResolveParseInto;
+                _typeParserResolver = ResolveParse;
 
                 Func<IJsonReader, Type, object> simpleConverter = (reader, type) =>
                 {
@@ -469,6 +480,16 @@ namespace PetaJson
                     return ri.ParseInto;
                 else
                     return null;
+            }
+
+            static Func<IJsonReader, Type, object> ResolveParse(Type type)
+            {
+                return (r, t) =>
+                {
+                    var into = Activator.CreateInstance(type);
+                    r.ParseInto(into);
+                    return into;
+                };
             }
 
             
@@ -624,8 +645,19 @@ namespace PetaJson
                     return lit;
                 }
 
+                // Call type parser resolver
+                if (type.IsValueType)
+                {
+                    var tp = _typeParserResolver(type);
+                    if (tp != null)
+                    {
+                        _typeParsers[type] = tp;
+                        return tp(this, type);
+                    }
+                }
+
                 // Is it a type we can parse into?
-                if ((type.IsClass || (type.IsValueType && !type.IsPrimitive)) && type != typeof(object))
+                if (type.IsClass && type != typeof(object))
                 {
                     var into = Activator.CreateInstance(type);
                     ParseInto(into);
@@ -834,6 +866,7 @@ namespace PetaJson
             public static Dictionary<Type, Func<IJsonReader, Type, object>> _typeParsers = new Dictionary<Type, Func<IJsonReader, Type, object>>();
             public static Dictionary<Type, Action<IJsonReader, object>> _typeIntoParsers = new Dictionary<Type, Action<IJsonReader, object>>();
             public static Func<Type, Action<IJsonReader, object>> _typeIntoParserResolver;
+            public static Func<Type, Func<IJsonReader, Type, object>> _typeParserResolver;
             public static Dictionary<Type, Func<IJsonReader, string, object>> _typeFactories = new Dictionary<Type, Func<IJsonReader, string, object>>();
         }
 
