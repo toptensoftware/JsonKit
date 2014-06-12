@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text;
 using PetaTest;
 using PetaJson;
+using System.Reflection;
 
 namespace TestCases
 {
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class ModelNotDecorated
     {
         public string Field1;
@@ -15,6 +17,7 @@ namespace TestCases
         public string Prop2 { get; set; }
     }
 
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class ModelInclude
     {
         [Json] public string Field1;
@@ -23,6 +26,7 @@ namespace TestCases
         public string Prop2 { get; set; }
     }
 
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class ModelExclude
     {
         public string Field1;
@@ -37,6 +41,7 @@ namespace TestCases
         public string Prop3 { get; set; }
     }
 
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class ModelRenamedMembers
     {
         [Json("Field1")] public string Field1;
@@ -46,6 +51,7 @@ namespace TestCases
     }
 
     [Json]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class InstanceObject
     {
         public int IntVal1;
@@ -55,6 +61,7 @@ namespace TestCases
     }
 
     [Json]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class ModelKeepInstance
     {
         [Json(KeepInstance=true)]
@@ -62,6 +69,15 @@ namespace TestCases
     }
 
     [Json]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
+    class ModelWithInstance
+    {
+        [Json]
+        public InstanceObject InstObj;
+    }
+
+    [Json]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     struct ModelStruct
     {
         public int IntField;
@@ -69,6 +85,7 @@ namespace TestCases
     }
 
     [TestFixture]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public class TestsReflection
     {
         [Test]
@@ -219,6 +236,36 @@ namespace TestCases
             // Test parseInto on a value type not supported
             var o3 = new ModelStruct();
             Assert.Throws<InvalidOperationException>(() => Json.ParseInto(json, o3));
+        }
+
+        [Test]
+        public void NullClassMember()
+        {
+            var m = new ModelWithInstance();
+            var json = Json.Format(m);
+
+            Assert.Contains(json, "null");
+
+            m.InstObj = new InstanceObject();
+
+            Json.ParseInto(json, m);
+            Assert.IsNull(m.InstObj);
+        }
+
+        [Test]
+        public void NullClass()
+        {
+            // Save null
+            var json = Json.Format(null);
+            Assert.AreEqual(json, "null");
+
+            // Load null
+            var m = Json.Parse<ModelWithInstance>("null");
+            Assert.IsNull(m);
+
+            // Should fail to parse null into an existing instance
+            m = new ModelWithInstance();
+            Assert.Throws<JsonParseException>(() => Json.ParseInto("null", m));
         }
     }
 }

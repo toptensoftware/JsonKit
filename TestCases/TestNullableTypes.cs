@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text;
 using PetaTest;
 using PetaJson;
+using System.Reflection;
 
 namespace TestCases
 {
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class NullableContainer
     {
         public int? Field;
@@ -14,6 +16,7 @@ namespace TestCases
     }
 
     [TestFixture]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public class TestNullableTypes
     {
         [Test]

@@ -5,12 +5,13 @@ using System.Text;
 using PetaJson;
 using PetaTest;
 using System.IO;
+using System.Reflection;
 
 namespace TestCases
 {
     abstract class Shape : IJsonWriting
     {
-        [Json] public string Color;
+        [Json("color")] public string Color;
 
         // Override OnJsonWriting to write out the derived class type
         void IJsonWriting.OnJsonWriting(IJsonWriter w)
@@ -22,17 +23,18 @@ namespace TestCases
 
     class Rectangle : Shape
     {
-        [Json]
+        [Json("cornerRadius")]
         public float CornerRadius;
     }
 
     class Ellipse : Shape
     {
-        [Json]
+        [Json("filled")]
         public bool Filled;
     }
 
     [TestFixture]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     class TestAbstractTypes
     {
         static TestAbstractTypes()
@@ -50,13 +52,14 @@ namespace TestCases
                 // Read the next literal (which better be a string) and instantiate the object
                 return reader.ReadLiteral(literal =>
                 {
-                    switch ((string)literal)
-                    {
-                        case "Rectangle": return new Rectangle();
-                        case "Ellipse": return new Ellipse();
-                        default:
-                            throw new InvalidDataException(string.Format("Unknown shape kind: '{0}'", literal));
-                    }
+                    var className = (string)literal;
+                    if (className == typeof(Rectangle).Name)
+                        return new Rectangle();
+
+                    if (className == typeof(Ellipse).Name)
+                        return new Ellipse();
+
+                    throw new InvalidDataException(string.Format("Unknown shape kind: '{0}'", literal));
                 });
             });
         }
@@ -75,8 +78,7 @@ namespace TestCases
             Console.WriteLine(json);
 
             // Check the object kinds were written out
-            Assert.Contains(json, "\"kind\": \"Rectangle\"");
-            Assert.Contains(json, "\"kind\": \"Ellipse\"");
+            Assert.Contains(json, "\"kind\":");
 
             // Reload the list
             var shapes2 = Json.Parse<List<Shape>>(json);

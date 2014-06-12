@@ -308,12 +308,14 @@ namespace PetaJson
     }
 
     // Called before loading via reflection
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonLoading
     {
         void OnJsonLoading(IJsonReader r);
     }
 
     // Called after loading via reflection
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonLoaded
     {
         void OnJsonLoaded(IJsonReader r);
@@ -321,18 +323,21 @@ namespace PetaJson
 
     // Called for each field while loading from reflection
     // Return true if handled
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonLoadField
     {
         bool OnJsonField(IJsonReader r, string key);
     }
 
     // Called when about to write using reflection
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonWriting
     {
         void OnJsonWriting(IJsonWriter w);
     }
 
     // Called after written using reflection
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonWritten
     {
         void OnJsonWritten(IJsonWriter w);
@@ -352,6 +357,7 @@ namespace PetaJson
     }
 
     // Passed to registered parsers
+    [Obfuscation(Exclude=true, ApplyToMembers=true)]
     public interface IJsonReader
     {
         object Parse(Type type);
@@ -368,6 +374,7 @@ namespace PetaJson
     }
 
     // Passed to registered formatters
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonWriter
     {
         void WriteStringLiteral(string str);
@@ -730,6 +737,11 @@ namespace PetaJson
             {
                 if (into == null)
                     return;
+
+                if (_tokenizer.CurrentToken == Token.Literal && _tokenizer.LiteralKind == LiteralKind.Null)
+                {
+                    throw new InvalidOperationException("can't parse null into existing instance");
+                }
 
                 var type = into.GetType();
 
@@ -2402,6 +2414,7 @@ namespace PetaJson
             {
                 object GetValue();
             }
+            [Obfuscation(Exclude = true, ApplyToMembers = true)]
             class PseudoBox<T> : IPseudoBox where T : struct
             {
                 public T value = default(T);
@@ -2777,6 +2790,7 @@ namespace PetaJson
             }
 
             // Helper to fetch a literal bool from an IJsonReader
+            [Obfuscation(Exclude = true)]
             public static bool GetLiteralBool(IJsonReader r)
             {
                 switch (r.GetLiteralKind())
@@ -2793,6 +2807,7 @@ namespace PetaJson
             }
 
             // Helper to fetch a literal character from an IJsonReader
+            [Obfuscation(Exclude = true)]
             public static char GetLiteralChar(IJsonReader r)
             {
                 if (r.GetLiteralKind() != LiteralKind.String)
@@ -2805,6 +2820,7 @@ namespace PetaJson
             }
 
             // Helper to fetch a literal string from an IJsonReader
+            [Obfuscation(Exclude = true)]
             public static string GetLiteralString(IJsonReader r)
             {
                 switch (r.GetLiteralKind())
@@ -2816,6 +2832,7 @@ namespace PetaJson
             }
 
             // Helper to fetch a literal number from an IJsonReader (returns the raw string)
+            [Obfuscation(Exclude = true)]
             public static string GetLiteralNumber(IJsonReader r)
             {
                 switch (r.GetLiteralKind())

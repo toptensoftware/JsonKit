@@ -4,11 +4,13 @@ using System.Linq;
 using System.Text;
 using PetaTest;
 using PetaJson;
+using System.Reflection;
 
 namespace TestCases
 {
 	[TestFixture]
-	public class TestsGeneral
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
+    public class TestsGeneral
 	{
 		[Test]
 		public void Format_Null()

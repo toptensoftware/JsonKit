@@ -6,6 +6,7 @@ using PetaTest;
 using PetaJson;
 using System.IO;
 using System.Globalization;
+using System.Reflection;
 
 namespace TestCases
 {
@@ -16,6 +17,7 @@ namespace TestCases
     }
 
     [TestFixture]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public class TestCustomFormat
     {
         static TestCustomFormat()

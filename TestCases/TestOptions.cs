@@ -4,10 +4,12 @@ using System.Linq;
 using System.Text;
 using PetaTest;
 using PetaJson;
+using System.Reflection;
 
 namespace TestCases
 {
     [TestFixture]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public class TestOptions
     {
         [Test]
