@@ -382,6 +382,18 @@ eg: the non-strict parser will allow this:
 		"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
 	}
 
+## Ramping it Up
+
+By itself, PetaJson provides a fairly simple, lightweight Json parser that is very portable and 
+performs reasonably well for many scenarios.  If however you need something with a bit more
+performance, there's an extension that uses System.Reflection.Emit to generate code at runtime
+and really speeds things up.
+
+To use it, simply add the file PetaJsonEmit.cs to your project and call PetaJson.JsonEmit.Init()
+from your startup code somewhere.
+
+With this enabled, performance is on-par (or possibly better) than most other Json parsers.
+
 
 ## IJsonReader and IJsonWriter
 
@@ -400,6 +412,9 @@ The IJsonReader interface reads from the Json input stream.
         void ReadArray(Action callback);
         object Parse(Type type);
         T Parse<T>();
+        LiteralKind GetLiteralKind();
+        string GetLiteralString();
+        void NextToken();
     }
 
 *ReadLiteral* - reads a single literal value from the input stream.  Throws an exception if
@@ -418,6 +433,9 @@ by the callback, PetaJson will skip the value and move onto the next key.
 routine must read each value from the IJsonReader before returning.
 
 *Parse* - parses a typed value from the input stream.
+
+*GetLiteralKind*, *GetLiteralString* and *NextToken* provide ability to read literals without boxing
+the value.  Used by the PetaJsonEmit.
 
 ### IJsonWriter
 
