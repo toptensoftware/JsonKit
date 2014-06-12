@@ -20,7 +20,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;PETAJSON_NO_EMIT</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -52,6 +52,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestAbstractTypes.cs" />
     <Compile Include="TestCustomFormat.cs" />
+    <Compile Include="TestNullableTypes.cs" />
     <Compile Include="TestOptions.cs" />
     <Compile Include="TestPrimitiveTypes.cs" />
     <Compile Include="TestsEvents.cs" />
