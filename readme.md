@@ -452,6 +452,18 @@ imagine a situation where a numeric ID field was incorrectly provided by a serve
 Note: although these event methods could have been implemented using reflection rather than interfaces,
 the use of interfaces is more discoverable through Intellisense/Autocomplete.
 
+## Cloning Objects
+
+PetaJson includes a couple of helper functions for cloning object:
+
+	var person1 = new Person() { Name = "Mr Json Bourne"; }
+	var person2 = Json.Clone(person1);
+
+You can also clone into an existing instance
+
+	var person3 = new Person();
+	Json.CloneInto(person3, person1);		// Copies from person1 to person3
+
 ## Options
 
 PetaJson has a couple of formatting/parsing options. These can be set as global defaults:

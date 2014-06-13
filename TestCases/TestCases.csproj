@@ -51,6 +51,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestAbstractTypes.cs" />
+    <Compile Include="TestConcreteFromInterface.cs" />
     <Compile Include="TestCustomFormat.cs" />
     <Compile Include="TestNullableTypes.cs" />
     <Compile Include="TestOptions.cs" />

@@ -702,8 +702,12 @@ namespace PetaJson
                     return listType.GetMethod("ToArray").Invoke(list, null);
                 }
 
+                // Convert interfaces to concrete types
+                if (type.IsInterface)
+                    type = Utils.ResolveInterfaceToClass(type);
+
                 // Untyped dictionary?
-                if (_tokenizer.CurrentToken == Token.OpenBrace && (type.IsAssignableFrom(typeof(Dictionary<string, object>))))
+                if (_tokenizer.CurrentToken == Token.OpenBrace && (type.IsAssignableFrom(typeof(IDictionary<string, object>))))
                 {
 #if !PETAJSON_NO_DYNAMIC
                     var container = (new ExpandoObject()) as IDictionary<string, object>;
@@ -717,7 +721,7 @@ namespace PetaJson
 
                     return container;
                 }
-
+               
                 // Untyped list?
                 if (_tokenizer.CurrentToken == Token.OpenSquare && (type.IsAssignableFrom(typeof(List<object>))))
                 {
@@ -1671,6 +1675,36 @@ namespace PetaJson
                 }
 
                 return false;
+            }
+
+            public static Type ResolveInterfaceToClass(Type tItf)
+            {
+                // Generic type
+                if (tItf.IsGenericType)
+                {
+                    var genDef = tItf.GetGenericTypeDefinition();
+
+                    // IList<> -> List<>
+                    if (genDef == typeof(IList<>))
+                    {
+                        return typeof(List<>).MakeGenericType(tItf.GetGenericArguments());
+                    }
+
+                    // IDictionary<string,> -> Dictionary<string,>
+                    if (genDef == typeof(IDictionary<,>) && tItf.GetGenericArguments()[0] == typeof(string))
+                    {
+                        return typeof(Dictionary<,>).MakeGenericType(tItf.GetGenericArguments());
+                    }
+                }
+
+                // IEnumerable -> List<object>
+                if (tItf == typeof(IEnumerable))
+                    return typeof(List<object>);
+
+                // IDicitonary -> Dictionary<string,object>
+                if (tItf == typeof(IDictionary))
+                    return typeof(Dictionary<string, object>);
+                return tItf;
             }
 
             public static long ToUnixMilliseconds(DateTime This)
