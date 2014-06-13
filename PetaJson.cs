@@ -117,7 +117,9 @@ namespace PetaJson
             }
             catch (Exception x)
             {
-                throw new JsonParseException(x, reader==null ? new JsonLineOffset() : reader.CurrentTokenPosition);
+				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
+				Console.WriteLine("Exception thrown while parsing JSON at {0}\n{1}", loc, x.ToString()); 
+				throw new JsonParseException(x,loc);
             }
         }
 
@@ -144,7 +146,9 @@ namespace PetaJson
             }
             catch (Exception x)
             {
-                throw new JsonParseException(x, reader==null ? new JsonLineOffset() : reader.CurrentTokenPosition);
+				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
+				Console.WriteLine("Exception thrown while parsing JSON at {0}\n{1}", loc, x.ToString()); 
+				throw new JsonParseException(x,loc);
             }
         }
 
@@ -554,6 +558,14 @@ namespace PetaJson
 
             static Func<IJsonReader, Type, object> ResolveParser(Type type)
             {
+				// Run the object's static constructors
+				Activator.CreateInstance(type);
+
+				// See if it registered
+				Func<IJsonReader, Type, object> parser;
+				if (_parsers.TryGetValue(type, out parser))
+					return parser;
+
                 return (r, t) =>
                 {
                     var into = Activator.CreateInstance(type);
@@ -1511,6 +1523,9 @@ namespace PetaJson
                     _lock.ExitReadLock();
                 }
 
+				// Create it while not holding lock
+				TValue valNew = createIt();
+
                 // Nope, take lock and try again
                 _lock.EnterWriteLock();
                 try
@@ -1519,8 +1534,8 @@ namespace PetaJson
                     TValue val;
                     if (!_map.TryGetValue(key, out val))
                     {
-                        // Now create it
-                        val = createIt();
+						// Store the new one
+						val = valNew;
                         _map[key] = val;
                     }
                     return val;
