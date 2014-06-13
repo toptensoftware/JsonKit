@@ -243,7 +243,7 @@ complex custom serialization using the IJsonReader and IJsonWriter interfaces - 
 
 ## Simple Formatting for Value Types
 
-The problem with the above methods is that it requires pre-registering the formatters and 
+The problem with the above method is that it requires pre-registering the formatters and 
 parsers which can be a pain. Another way to do custom formatting for value types is by 
 implementing methods directly on the struct.  This approach is more intrusive but also 
 more self-contained.
@@ -305,7 +305,7 @@ Suppose we have a class heirarchy something like this:
     	// Omitted
     }
 
-and we'd like to serialize a list of Shapes to Json like this:
+and we'd like to serialize a list of Shapes to JSON like this:
 
 	[
 		{ "kind": "Rectangle", /* other rectangle properties omitted */ },
@@ -313,7 +313,7 @@ and we'd like to serialize a list of Shapes to Json like this:
 		// etc...
 	]
 
-In other words a value in the Json dictionary determines the type of object that 
+In other words a value in the JSON dictionary determines the type of object that 
 needs to be instantiated for that element.
 
 We can write out the shape kind by implementing the IJsonWriting interface which gets called
@@ -418,7 +418,38 @@ For example, it's often necessary to wire up ownership references on loaded sub-
 		}
 	}
 
-Note: although these methods could have been implemented using reflection rather than interfaces,
+The IJsonLoadField interface can be used to "fix up" income JSON data.  For example, imagine
+a situation where a numeric ID field was incorrectly provided by a server as a string 
+(enclosed in quotes) instead of a plain number.
+
+
+	class MyRecord : IJsonLoadField
+	{
+		[Json] long id;				// Note: numeric (not string) field
+		[Json] string description;
+
+		// Override OnJsonField to intercept the bad server data
+		bool IJsonLoadField.OnJsonField(IJsonReader r, string key)
+		{
+			// id provided as string? Eg: "id": "1234"
+			if (key=="id" && r.GetLiteralKind()==LiteralKind.String)
+			{
+				// Parse the string
+				id = long.Parse(r.GetLiteralString());
+
+				// Skip the string literal not that we've handled it
+				r.NextToken();		
+
+				// Return true to suppress default processing of this key
+				return true;
+			}
+
+			// Other keys and non-quoted id field values processed as normal
+			return false;			
+		}
+	}
+
+Note: although these event methods could have been implemented using reflection rather than interfaces,
 the use of interfaces is more discoverable through Intellisense/Autocomplete.
 
 ## Options
@@ -456,12 +487,12 @@ eg: the non-strict parser will allow this:
 ## IJsonReader and IJsonWriter
 
 These interfaces only need to be used when writing custom formatters and parsers.  They are the low
-level interfaces used to read and write the Json stream and are passed to the callbacks for custom
+level interfaces used to read and write the JSON stream and are passed to the callbacks for custom
 parsers and formatters.
 
 ### IJsonReader
 
-The IJsonReader interface reads from the Json input stream.  
+The IJsonReader interface reads from the JSON input stream.  
 
     public interface IJsonReader
     {
@@ -483,11 +514,11 @@ Wherever possible, conversion should be done in the callback to ensure that erro
 report the error location just before the bad literal, instead of after it.
 
 
-*ReadDictionary* - reads a Json dictionary, calling the callback for each key encountered.  The
+*ReadDictionary* - reads a JSON dictionary, calling the callback for each key encountered.  The
 callback routine should read the key's value using the IJsonReader interface.  If nothing is read
 by the callback, PetaJson will skip the value and move onto the next key.
 
-*ReadArray* - reads a Json array, calling the callback at each element position. The callback 
+*ReadArray* - reads a JSON array, calling the callback at each element position. The callback 
 routine must read each value from the IJsonReader before returning.
 
 *Parse* - parses a typed value from the input stream.
@@ -498,7 +529,7 @@ ReadLiteral, but less convenient to use.
 
 ### IJsonWriter
 
-The IJsonWriter interface writes to the Json output stream:
+The IJsonWriter interface writes to the JSON output stream:
 
     public interface IJsonWriter
     {
@@ -514,7 +545,7 @@ The IJsonWriter interface writes to the Json output stream:
 *WriteStringLiteral* - writes a string literal to the output stream, including the surrounding quotes and
  escaping the content as required.
 
-*WriteRaw* - writes directly to the output stream.  Use for comments, or self generated Json data.
+*WriteRaw* - writes directly to the output stream.  Use for comments, or self generated JSON data.
 
 *WriteArray* - writes an array to the output stream.  The callback should write each element.
 
