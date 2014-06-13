@@ -418,8 +418,8 @@ For example, it's often necessary to wire up ownership references on loaded sub-
 		}
 	}
 
-The IJsonLoadField interface can be used to "fix up" income JSON data.  For example, imagine
-a situation where a numeric ID field was incorrectly provided by a server as a string 
+The IJsonLoadField interface can be used to "fix up" incorrect incoming JSON data.  For example, 
+imagine a situation where a numeric ID field was incorrectly provided by a server as a string 
 (enclosed in quotes) instead of a plain number.
 
 
