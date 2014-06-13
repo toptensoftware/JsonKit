@@ -558,13 +558,28 @@ namespace PetaJson
 
             static Func<IJsonReader, Type, object> ResolveParser(Type type)
             {
-				// Run the object's static constructors
-				Activator.CreateInstance(type);
-
-				// See if it registered
-				Func<IJsonReader, Type, object> parser;
-				if (_parsers.TryGetValue(type, out parser))
-					return parser;
+                // See if the Type has a static parser method - T ParseJson(IJsonReader)
+                var parseJson = ReflectionInfo.FindParseJson(type);
+                if (parseJson != null)
+                {
+                    if (parseJson.GetParameters()[0].ParameterType == typeof(IJsonReader))
+                    {
+                        return (r, t) => parseJson.Invoke(null, new Object[] { r });
+                    }
+                    else
+                    {
+                        return (r, t) =>
+                        {
+                            if (r.GetLiteralKind() == LiteralKind.String)
+                            {
+                                var o = parseJson.Invoke(null, new Object[] { r.GetLiteralString() });
+                                r.NextToken();
+                                return o;
+                            }
+                            throw new InvalidDataException(string.Format("Expected string literal for type {0}", type.FullName));
+                        };
+                    }
+                }
 
                 return (r, t) =>
                 {
@@ -984,6 +999,16 @@ namespace PetaJson
 
             static Action<IJsonWriter, object> ResolveFormatter(Type type)
             {
+                // Try `void FormatJson(IJsonWriter)`
+                var formatJson = ReflectionInfo.FindFormatJson(type);
+                if (formatJson != null)
+                {
+                    if (formatJson.ReturnType==typeof(void))
+                        return (w, obj) => formatJson.Invoke(obj, new Object[] { w });
+                    if (formatJson.ReturnType == typeof(string))
+                        return (w, obj) => w.WriteStringLiteral((string)formatJson.Invoke(obj, new Object[] { }));
+                }
+
                 var ri = ReflectionInfo.GetReflectionInfo(type);
                 if (ri != null)
                     return ri.Write;
@@ -1308,6 +1333,38 @@ namespace PetaJson
             // Cache of these ReflectionInfos's
             static ThreadSafeCache<Type, ReflectionInfo> _cache = new ThreadSafeCache<Type, ReflectionInfo>();
 
+            public static MethodInfo FindFormatJson(Type type)
+            {
+                if (type.IsValueType)
+                {
+                    // Try `void FormatJson(IJsonWriter)`
+                    var formatJson = type.GetMethod("FormatJson", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(IJsonWriter) }, null);
+                    if (formatJson != null && formatJson.ReturnType == typeof(void))
+                        return formatJson;
+
+                    // Try `string FormatJson()`
+                    formatJson = type.GetMethod("FormatJson", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { }, null);
+                    if (formatJson != null && formatJson.ReturnType == typeof(string))
+                        return formatJson;
+                }
+                return null;
+            }
+
+            public static MethodInfo FindParseJson(Type type)
+            {
+                // Try `T ParseJson(IJsonReader)`
+                var parseJson = type.GetMethod("ParseJson", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, new Type[] { typeof(IJsonReader) }, null);
+                if (parseJson != null && parseJson.ReturnType == type)
+                    return parseJson;
+
+                // Try `T ParseJson(string)`
+                parseJson = type.GetMethod("ParseJson", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, new Type[] { typeof(string) }, null);
+                if (parseJson != null && parseJson.ReturnType == type)
+                    return parseJson;
+
+                return null;
+            }
+
             // Write one of these types
             public void Write(IJsonWriter w, object val)
             {
@@ -1523,9 +1580,6 @@ namespace PetaJson
                     _lock.ExitReadLock();
                 }
 
-				// Create it while not holding lock
-				TValue valNew = createIt();
-
                 // Nope, take lock and try again
                 _lock.EnterWriteLock();
                 try
@@ -1535,7 +1589,7 @@ namespace PetaJson
                     if (!_map.TryGetValue(key, out val))
                     {
 						// Store the new one
-						val = valNew;
+						val = createIt();
                         _map[key] = val;
                     }
                     return val;
@@ -2169,258 +2223,285 @@ namespace PetaJson
             // Generates a function that when passed an object of specified type, renders it to an IJsonReader
             public static Action<IJsonWriter, object> MakeFormatter(Type type)
             {
-                // Get the reflection info for this type
-                var ri = ReflectionInfo.GetReflectionInfo(type);
-                if (ri == null)
-                    return null;
+                var formatJson = ReflectionInfo.FindFormatJson(type);
+                if (formatJson != null)
+                {
+                    var method = new DynamicMethod("invoke_formatJson", null, new Type[] { typeof(IJsonWriter), typeof(Object) }, true);
+                    var il = method.GetILGenerator();
+                    if (formatJson.ReturnType == typeof(string))
+                    {
+                        // w.WriteStringLiteral(o.FormatJson())
+                        il.Emit(OpCodes.Ldarg_0); 
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Unbox, type);
+                        il.Emit(OpCodes.Call, formatJson);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral"));
+                    }
+                    else
+                    {
+                        // o.FormatJson(w);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, formatJson);
+                    }
+                    il.Emit(OpCodes.Ret);
+                    return (Action<IJsonWriter, object>)method.CreateDelegate(typeof(Action<IJsonWriter, object>));
+                }
+                else
+                {
+                    // Get the reflection info for this type
+                    var ri = ReflectionInfo.GetReflectionInfo(type);
+                    if (ri == null)
+                        return null;
 
-                // Create a dynamic method that can do the work
-                var method = new DynamicMethod("dynamic_formatter", null, new Type[] { typeof(IJsonWriter), typeof(object) }, true);
-                var il = method.GetILGenerator();
+                    // Create a dynamic method that can do the work
+                    var method = new DynamicMethod("dynamic_formatter", null, new Type[] { typeof(IJsonWriter), typeof(object) }, true);
+                    var il = method.GetILGenerator();
 
-                // Cast/unbox the target object and store in local variable
-                var locTypedObj = il.DeclareLocal(type);
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
-                il.Emit(OpCodes.Stloc, locTypedObj);
+                    // Cast/unbox the target object and store in local variable
+                    var locTypedObj = il.DeclareLocal(type);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(type.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, type);
+                    il.Emit(OpCodes.Stloc, locTypedObj);
 
-                // Get Invariant CultureInfo (since we'll probably be needing this)
-                var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
-                il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
-                il.Emit(OpCodes.Stloc, locInvariant);
+                    // Get Invariant CultureInfo (since we'll probably be needing this)
+                    var locInvariant = il.DeclareLocal(typeof(IFormatProvider));
+                    il.Emit(OpCodes.Call, typeof(CultureInfo).GetProperty("InvariantCulture").GetGetMethod());
+                    il.Emit(OpCodes.Stloc, locInvariant);
 
-                // These are the types we'll call .ToString(Culture.InvariantCulture) on
-                var toStringTypes = new Type[] { 
+                    // These are the types we'll call .ToString(Culture.InvariantCulture) on
+                    var toStringTypes = new Type[] { 
                     typeof(int), typeof(uint), typeof(long), typeof(ulong), 
                     typeof(short), typeof(ushort), typeof(decimal), 
                     typeof(byte), typeof(sbyte)
                 };
 
-                // Theses types we also generate for
-                var otherSupportedTypes = new Type[] {
+                    // Theses types we also generate for
+                    var otherSupportedTypes = new Type[] {
                     typeof(double), typeof(float), typeof(string), typeof(char)
                 };
 
-                // Call IJsonWriting if implemented
-                if (typeof(IJsonWriting).IsAssignableFrom(type))
-                {
-                    if (type.IsValueType)
+                    // Call IJsonWriting if implemented
+                    if (typeof(IJsonWriting).IsAssignableFrom(type))
                     {
-                        il.Emit(OpCodes.Ldloca, locTypedObj);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWriting)).TargetMethods[0]);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Ldloc, locTypedObj);
-                        il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWriting", new Type[] { typeof(IJsonWriter) }));
-                    }
-                }
-
-                // Process all members
-                foreach (var m in ri.Members)
-                {
-                    // Ignore write only properties
-                    var pi = m.Member as PropertyInfo;
-                    if (pi != null && pi.GetGetMethod() == null)
-                    {
-                        continue;
-                    }
-
-                    // Write the Json key
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldstr, m.JsonKey);
-                    il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteKeyNoEscaping", new Type[] { typeof(string) }));
-
-                    // Load the writer
-                    il.Emit(OpCodes.Ldarg_0);
-
-                    // Get the member type
-                    var memberType = m.MemberType;
-
-                    // Load the target object
-                    if (type.IsValueType)
-                    {
-                        il.Emit(OpCodes.Ldloca, locTypedObj);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Ldloc, locTypedObj);
-                    }
-
-                    // Work out if we need the value or it's address on the stack
-                    bool NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
-                    if (Nullable.GetUnderlyingType(memberType) != null)
-                    {
-                        NeedValueAddress = true;
-                    }
-
-                    // Property?
-                    if (pi != null)
-                    {
-                        // Call property's get method
                         if (type.IsValueType)
-                            il.Emit(OpCodes.Call, pi.GetGetMethod());
-                        else
-                            il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
-
-                        // If we need the address then store in a local and take it's address
-                        if (NeedValueAddress)
                         {
-                            var locTemp = il.DeclareLocal(memberType);
-                            il.Emit(OpCodes.Stloc, locTemp);
-                            il.Emit(OpCodes.Ldloca, locTemp);
-                        }
-                    }
-
-                    // Field?
-                    var fi = m.Member as FieldInfo;
-                    if (fi != null)
-                    {
-                        if (NeedValueAddress)
-                        {
-                            il.Emit(OpCodes.Ldflda, fi);
+                            il.Emit(OpCodes.Ldloca, locTypedObj);
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWriting)).TargetMethods[0]);
                         }
                         else
                         {
-                            il.Emit(OpCodes.Ldfld, fi);
+                            il.Emit(OpCodes.Ldloc, locTypedObj);
+                            il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWriting", new Type[] { typeof(IJsonWriter) }));
                         }
                     }
 
-                    Label? lblFinished = null;
-
-                    // Is it a nullable type?
-                    var typeUnderlying = Nullable.GetUnderlyingType(memberType);
-                    if (typeUnderlying != null)
+                    // Process all members
+                    foreach (var m in ri.Members)
                     {
-                        // Duplicate the address so we can call get_HasValue() and then get_Value()
-                        il.Emit(OpCodes.Dup);
-
-                        // Define some labels
-                        var lblHasValue = il.DefineLabel();
-                        lblFinished = il.DefineLabel();
-
-                        // Call has_Value
-                        il.Emit(OpCodes.Call, memberType.GetProperty("HasValue").GetGetMethod());
-                        il.Emit(OpCodes.Brtrue, lblHasValue);
-
-                        // No value, write "null:
-                        il.Emit(OpCodes.Pop);
-                        il.Emit(OpCodes.Ldstr, "null");
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
-                        il.Emit(OpCodes.Br_S, lblFinished.Value);
-
-                        // Get it's value
-                        il.MarkLabel(lblHasValue);
-                        il.Emit(OpCodes.Call, memberType.GetProperty("Value").GetGetMethod());
-
-                        // Switch to the underlying type from here on
-                        memberType = typeUnderlying;
-                        NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
-
-                        // Work out again if we need the address of the value
-                        if (NeedValueAddress)
+                        // Ignore write only properties
+                        var pi = m.Member as PropertyInfo;
+                        if (pi != null && pi.GetGetMethod() == null)
                         {
-                            var locTemp = il.DeclareLocal(memberType);
-                            il.Emit(OpCodes.Stloc, locTemp);
-                            il.Emit(OpCodes.Ldloca, locTemp);
+                            continue;
                         }
-                    }
 
-                    // ToString()
-                    if (toStringTypes.Contains(memberType))
-                    {
-                        // Convert to string
-                        il.Emit(OpCodes.Ldloc, locInvariant);
-                        il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(IFormatProvider) }));
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
-                    }
+                        // Write the Json key
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldstr, m.JsonKey);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteKeyNoEscaping", new Type[] { typeof(string) }));
 
-                    // ToString("R")
-                    else if (memberType == typeof(float) || memberType == typeof(double))
-                    {
-                        il.Emit(OpCodes.Ldstr, "R");
-                        il.Emit(OpCodes.Ldloc, locInvariant);
-                        il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(string), typeof(IFormatProvider) }));
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
-                    }
+                        // Load the writer
+                        il.Emit(OpCodes.Ldarg_0);
 
-                    // String?
-                    else if (memberType == typeof(string))
-                    {
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
-                    }
+                        // Get the member type
+                        var memberType = m.MemberType;
 
-                    // Char?
-                    else if (memberType == typeof(char))
-                    {
-                        il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { }));
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
-                    }
-
-                    // Bool?
-                    else if (memberType == typeof(bool))
-                    {
-                        var lblTrue = il.DefineLabel();
-                        var lblCont = il.DefineLabel();
-                        il.Emit(OpCodes.Brtrue_S, lblTrue);
-                        il.Emit(OpCodes.Ldstr, "false");
-                        il.Emit(OpCodes.Br_S, lblCont);
-                        il.MarkLabel(lblTrue);
-                        il.Emit(OpCodes.Ldstr, "true");
-                        il.MarkLabel(lblCont);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
-                    }
-
-                    // NB: We don't support DateTime as it's format can be changed
-
-                    else
-                    {
-                        // Unsupported type, pass through
-                        if (memberType.IsValueType)
+                        // Load the target object
+                        if (type.IsValueType)
                         {
-                            il.Emit(OpCodes.Box, memberType);
+                            il.Emit(OpCodes.Ldloca, locTypedObj);
                         }
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteValue", new Type[] { typeof(object) }));
+                        else
+                        {
+                            il.Emit(OpCodes.Ldloc, locTypedObj);
+                        }
+
+                        // Work out if we need the value or it's address on the stack
+                        bool NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
+                        if (Nullable.GetUnderlyingType(memberType) != null)
+                        {
+                            NeedValueAddress = true;
+                        }
+
+                        // Property?
+                        if (pi != null)
+                        {
+                            // Call property's get method
+                            if (type.IsValueType)
+                                il.Emit(OpCodes.Call, pi.GetGetMethod());
+                            else
+                                il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
+
+                            // If we need the address then store in a local and take it's address
+                            if (NeedValueAddress)
+                            {
+                                var locTemp = il.DeclareLocal(memberType);
+                                il.Emit(OpCodes.Stloc, locTemp);
+                                il.Emit(OpCodes.Ldloca, locTemp);
+                            }
+                        }
+
+                        // Field?
+                        var fi = m.Member as FieldInfo;
+                        if (fi != null)
+                        {
+                            if (NeedValueAddress)
+                            {
+                                il.Emit(OpCodes.Ldflda, fi);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Ldfld, fi);
+                            }
+                        }
+
+                        Label? lblFinished = null;
+
+                        // Is it a nullable type?
+                        var typeUnderlying = Nullable.GetUnderlyingType(memberType);
+                        if (typeUnderlying != null)
+                        {
+                            // Duplicate the address so we can call get_HasValue() and then get_Value()
+                            il.Emit(OpCodes.Dup);
+
+                            // Define some labels
+                            var lblHasValue = il.DefineLabel();
+                            lblFinished = il.DefineLabel();
+
+                            // Call has_Value
+                            il.Emit(OpCodes.Call, memberType.GetProperty("HasValue").GetGetMethod());
+                            il.Emit(OpCodes.Brtrue, lblHasValue);
+
+                            // No value, write "null:
+                            il.Emit(OpCodes.Pop);
+                            il.Emit(OpCodes.Ldstr, "null");
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
+                            il.Emit(OpCodes.Br_S, lblFinished.Value);
+
+                            // Get it's value
+                            il.MarkLabel(lblHasValue);
+                            il.Emit(OpCodes.Call, memberType.GetProperty("Value").GetGetMethod());
+
+                            // Switch to the underlying type from here on
+                            memberType = typeUnderlying;
+                            NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
+
+                            // Work out again if we need the address of the value
+                            if (NeedValueAddress)
+                            {
+                                var locTemp = il.DeclareLocal(memberType);
+                                il.Emit(OpCodes.Stloc, locTemp);
+                                il.Emit(OpCodes.Ldloca, locTemp);
+                            }
+                        }
+
+                        // ToString()
+                        if (toStringTypes.Contains(memberType))
+                        {
+                            // Convert to string
+                            il.Emit(OpCodes.Ldloc, locInvariant);
+                            il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(IFormatProvider) }));
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
+                        }
+
+                        // ToString("R")
+                        else if (memberType == typeof(float) || memberType == typeof(double))
+                        {
+                            il.Emit(OpCodes.Ldstr, "R");
+                            il.Emit(OpCodes.Ldloc, locInvariant);
+                            il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(string), typeof(IFormatProvider) }));
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
+                        }
+
+                        // String?
+                        else if (memberType == typeof(string))
+                        {
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
+                        }
+
+                        // Char?
+                        else if (memberType == typeof(char))
+                        {
+                            il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { }));
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
+                        }
+
+                        // Bool?
+                        else if (memberType == typeof(bool))
+                        {
+                            var lblTrue = il.DefineLabel();
+                            var lblCont = il.DefineLabel();
+                            il.Emit(OpCodes.Brtrue_S, lblTrue);
+                            il.Emit(OpCodes.Ldstr, "false");
+                            il.Emit(OpCodes.Br_S, lblCont);
+                            il.MarkLabel(lblTrue);
+                            il.Emit(OpCodes.Ldstr, "true");
+                            il.MarkLabel(lblCont);
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
+                        }
+
+                        // NB: We don't support DateTime as it's format can be changed
+
+                        else
+                        {
+                            // Unsupported type, pass through
+                            if (memberType.IsValueType)
+                            {
+                                il.Emit(OpCodes.Box, memberType);
+                            }
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteValue", new Type[] { typeof(object) }));
+                        }
+
+                        if (lblFinished.HasValue)
+                            il.MarkLabel(lblFinished.Value);
                     }
 
-                    if (lblFinished.HasValue)
-                        il.MarkLabel(lblFinished.Value);
+                    // Call IJsonWritten
+                    if (typeof(IJsonWritten).IsAssignableFrom(type))
+                    {
+                        if (type.IsValueType)
+                        {
+                            il.Emit(OpCodes.Ldloca, locTypedObj);
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWritten)).TargetMethods[0]);
+                        }
+                        else
+                        {
+                            il.Emit(OpCodes.Ldloc, locTypedObj);
+                            il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
+                        }
+                    }
+
+                    // Done!
+                    il.Emit(OpCodes.Ret);
+                    var impl = (Action<IJsonWriter, object>)method.CreateDelegate(typeof(Action<IJsonWriter, object>));
+
+                    // Wrap it in a call to WriteDictionary
+                    return (w, obj) =>
+                    {
+                        w.WriteDictionary(() =>
+                        {
+                            impl(w, obj);
+                        });
+                    };
                 }
-
-                // Call IJsonWritten
-                if (typeof(IJsonWritten).IsAssignableFrom(type))
-                {
-                    if (type.IsValueType)
-                    {
-                        il.Emit(OpCodes.Ldloca, locTypedObj);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Call, type.GetInterfaceMap(typeof(IJsonWritten)).TargetMethods[0]);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Ldloc, locTypedObj);
-                        il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
-                    }
-                }
-
-                // Done!
-                il.Emit(OpCodes.Ret);
-                var impl = (Action<IJsonWriter, object>)method.CreateDelegate(typeof(Action<IJsonWriter, object>));
-
-                // Wrap it in a call to WriteDictionary
-                return (w, obj) =>
-                {
-                    w.WriteDictionary(() =>
-                    {
-                        impl(w, obj);
-                    });
-                };
-
             }
 
             // Pseudo box lets us pass a value type by reference.  Used during 
@@ -2442,94 +2523,135 @@ namespace PetaJson
             {
                 System.Diagnostics.Debug.Assert(type.IsValueType);
 
-                // Get the reflection info for this type
-                var ri = ReflectionInfo.GetReflectionInfo(type);
-                if (ri == null)
-                    return null;
-
-                // We'll create setters for each property/field
-                var setters = new Dictionary<string, Action<IJsonReader, object>>();
-
-                // Store the value in a pseudo box until it's fully initialized
-                var boxType = typeof(PseudoBox<>).MakeGenericType(type);
-
-                // Process all members
-                foreach (var m in ri.Members)
+                // ParseJson method?
+                var parseJson = ReflectionInfo.FindParseJson(type);
+                if (parseJson != null)
                 {
-                    // Ignore write only properties
-                    var pi = m.Member as PropertyInfo;
-                    var fi = m.Member as FieldInfo;
-                    if (pi != null && pi.GetSetMethod() == null)
+                    if (parseJson.GetParameters()[0].ParameterType == typeof(IJsonReader))
                     {
-                        continue;
+                        var method = new DynamicMethod("invoke_ParseJson", typeof(Object), new Type[] { typeof(IJsonReader), typeof(Type) }, true);
+                        var il = method.GetILGenerator();
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, parseJson);
+                        il.Emit(OpCodes.Box, type);
+                        il.Emit(OpCodes.Ret);
+                        return (Func<IJsonReader,Type,object>)method.CreateDelegate(typeof(Func<IJsonReader,Type,object>));
+                    }
+                    else
+                    {
+                        var method = new DynamicMethod("invoke_ParseJson", typeof(Object), new Type[] { typeof(string) }, true);
+                        var il = method.GetILGenerator();
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, parseJson);
+                        il.Emit(OpCodes.Box, type);
+                        il.Emit(OpCodes.Ret);
+                        var invoke = (Func<string, object>)method.CreateDelegate(typeof(Func<string, object>));
+
+                        return (r, t) =>
+                        {
+                            if (r.GetLiteralKind() == LiteralKind.String)
+                            {
+                                var o = invoke(r.GetLiteralString());
+                                r.NextToken();
+                                return o;
+                            }
+                            throw new InvalidDataException(string.Format("Expected string literal for type {0}", type.FullName));
+                        };
+                    }
+                }
+                else
+                {
+                    // Get the reflection info for this type
+                    var ri = ReflectionInfo.GetReflectionInfo(type);
+                    if (ri == null)
+                        return null;
+
+                    // We'll create setters for each property/field
+                    var setters = new Dictionary<string, Action<IJsonReader, object>>();
+
+                    // Store the value in a pseudo box until it's fully initialized
+                    var boxType = typeof(PseudoBox<>).MakeGenericType(type);
+
+                    // Process all members
+                    foreach (var m in ri.Members)
+                    {
+                        // Ignore write only properties
+                        var pi = m.Member as PropertyInfo;
+                        var fi = m.Member as FieldInfo;
+                        if (pi != null && pi.GetSetMethod() == null)
+                        {
+                            continue;
+                        }
+
+                        // Create a dynamic method that can do the work
+                        var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
+                        var il = method.GetILGenerator();
+
+                        // Load the target
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Castclass, boxType);
+                        il.Emit(OpCodes.Ldflda, boxType.GetField("value"));
+
+                        // Get the value
+                        GenerateGetJsonValue(m, il);
+
+                        // Assign it
+                        if (pi != null)
+                            il.Emit(OpCodes.Call, pi.GetSetMethod());
+                        if (fi != null)
+                            il.Emit(OpCodes.Stfld, fi);
+
+                        // Done
+                        il.Emit(OpCodes.Ret);
+
+                        // Store in the map of setters
+                        setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
                     }
 
-                    // Create a dynamic method that can do the work
-                    var method = new DynamicMethod("dynamic_parser", null, new Type[] { typeof(IJsonReader), typeof(object) }, true);
-                    var il = method.GetILGenerator();
+                    // Create helpers to invoke the interfaces (this is painful but avoids having to really box 
+                    // the value in order to call the interface).
+                    Action<object, IJsonReader> invokeLoading = MakeInterfaceCall(type, typeof(IJsonLoading));
+                    Action<object, IJsonReader> invokeLoaded = MakeInterfaceCall(type, typeof(IJsonLoaded));
+                    Func<object, IJsonReader, string, bool> invokeField = MakeLoadFieldCall(type);
 
-                    // Load the target
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Castclass, boxType);
-                    il.Emit(OpCodes.Ldflda, boxType.GetField("value"));
+                    // Create the parser
+                    Func<IJsonReader, Type, object> parser = (reader, Type) =>
+                    {
+                        // Create pseudobox (ie: new PseudoBox<Type>)
+                        var box = Activator.CreateInstance(boxType);
 
-                    // Get the value
-                    GenerateGetJsonValue(m, il);
+                        // Call IJsonLoading
+                        if (invokeLoading != null)
+                            invokeLoading(box, reader);
 
-                    // Assign it
-                    if (pi != null)
-                        il.Emit(OpCodes.Call, pi.GetSetMethod());
-                    if (fi != null)
-                        il.Emit(OpCodes.Stfld, fi);
+                        // Read the dictionary
+                        reader.ParseDictionary(key =>
+                        {
+                            // Call IJsonLoadField
+                            if (invokeField != null && invokeField(box, reader, key))
+                                return;
+
+                            // Get a setter and invoke it if found
+                            Action<IJsonReader, object> setter;
+                            if (setters.TryGetValue(key, out setter))
+                            {
+                                setter(reader, box);
+                            }
+                        });
+
+                        // IJsonLoaded
+                        if (invokeLoaded != null)
+                            invokeLoaded(box, reader);
+
+                        // Return the value
+                        return ((IPseudoBox)box).GetValue();
+                    };
 
                     // Done
-                    il.Emit(OpCodes.Ret);
-
-                    // Store in the map of setters
-                    setters.Add(m.JsonKey, (Action<IJsonReader, object>)method.CreateDelegate(typeof(Action<IJsonReader, object>)));
+                    return parser;
                 }
-
-                // Create helpers to invoke the interfaces (this is painful but avoids having to really box 
-                // the value in order to call the interface).
-                Action<object, IJsonReader> invokeLoading = MakeInterfaceCall(type, typeof(IJsonLoading));
-                Action<object, IJsonReader> invokeLoaded = MakeInterfaceCall(type, typeof(IJsonLoaded));
-                Func<object, IJsonReader, string, bool> invokeField = MakeLoadFieldCall(type);
-
-                // Create the parser
-                Func<IJsonReader, Type, object> parser = (reader, Type) =>
-                {
-                    // Create pseudobox (ie: new PseudoBox<Type>)
-                    var box = Activator.CreateInstance(boxType);
-
-                    // Call IJsonLoading
-                    if (invokeLoading != null)
-                        invokeLoading(box, reader);
-
-                    // Read the dictionary
-                    reader.ParseDictionary(key =>
-                    {
-                        // Call IJsonLoadField
-                        if (invokeField != null && invokeField(box, reader, key))
-                            return;
-
-                        // Get a setter and invoke it if found
-                        Action<IJsonReader, object> setter;
-                        if (setters.TryGetValue(key, out setter))
-                        {
-                            setter(reader, box);
-                        }
-                    });
-
-                    // IJsonLoaded
-                    if (invokeLoaded != null)
-                        invokeLoaded(box, reader);
-
-                    // Return the value
-                    return ((IPseudoBox)box).GetValue();
-                };
-
-                // Done
-                return parser;
             }
 
             // Helper to make the call to a PsuedoBox value's IJsonLoading or IJsonLoaded

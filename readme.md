@@ -206,7 +206,7 @@ and we want to serialize points as a comma separated string like this:
 		"BottomRight: "30,40",
 	}
 
-To do this, we need to register a formatter:
+To do this, we can to register a formatter:
 
     // Register custom formatter
     Json.RegisterFormatter<Point>( (writer,point) => 
@@ -240,6 +240,51 @@ We can now format and parse Points:
 
 Note that in this example we're formatting to a single string literal.  We can do more
 complex custom serialization using the IJsonReader and IJsonWriter interfaces - see below.
+
+## Simple Formatting for Value Types
+
+The problem with the above methods is that it requires pre-registering the formatters and 
+parsers which can be a pain. Another way to do custom formatting for value types is by 
+implementing methods directly on the struct.  This approach is more intrusive but also 
+more self-contained.
+
+The methods must have the following method names and signatures and can be public or not.
+
+	// One of these:
+	void FormatJson(IJsonWriter w);
+	string FormatJson();
+
+	// And one of these
+	static T ParseJson(IJsonReader r);
+	static T ParseJson(string literal);
+
+For example, this is the equivalent of the above example:
+
+    struct Point
+    {
+        public int X;
+        public int Y;
+
+		string FormatJson() 
+		{ 
+			return string.Format("{0},{1}", X, Y);
+		};
+
+		static Point ParseJson(string literal)
+		{
+			var parts = literal.Split(',');
+			if (parts.Length!=2)
+				throw new InvalidDataException("Badly formatted point");
+
+			return new Point()
+			{
+				X = int.Parse(parts[0], CultureInfo.InvariantCulture),
+				Y = int.Parse(parts[0], CultureInfo.InvariantCulture),
+			};
+		}
+    }
+
+Note: this approach only works for structs (not classes)
 
 ## Custom Factories
 
