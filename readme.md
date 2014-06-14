@@ -9,7 +9,9 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 * Support for dynamic Expando (read) and anonymous types (write)
 * Choose from good performance + portable (System.Reflection), or high performance + less portable (using System.Reflection.Emit)
 * Custom formatting and parsing of any type
-* Support for serialization of abstract/virtual types
+* Support for serialization of polymorphic types
+* Utilities for cloning and reparsing objects into different types
+* Bonus IDictionary<string,object> extensions simplifies working with weakly typed JSON data.
 * Directly reads from TextReader and writes to TextWriter and any underlying stream
 * Simple set of custom attributes to control serialization
 * Optional non-strict parsing allows comments, non-quoted dictionary keys, trailing commas and hex literals (great for config files)
@@ -191,7 +193,7 @@ there's no need for an exclude attribute as only members marked DataMember are i
 
 ## Custom Formatting
 
-Custom formatting can be used for any type.  Say we have the following type:
+Custom formatting can be used on any type.  Say we have the following type:
 
     struct Point
     {
@@ -286,7 +288,7 @@ For example, this is the equivalent of the above example:
 
 Note: this approach only works for structs (not classes)
 
-## Custom Factories
+## Custom Factories and Polymorphic Types
 
 Suppose we have a class heirarchy something like this:
 
