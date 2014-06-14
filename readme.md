@@ -410,11 +410,8 @@ For example, it's often necessary to wire up ownership references on loaded sub-
 
 		void IJsonLoaded.OnJsonLoaded()
 		{
-			// Shapes have been loaded, set back reference to self
-			foreach (var s in Shapes)
-			{
-				s.Owner = this;
-			}
+			// Shapes have been loaded, set owner references
+			Shapes.ForEach(x => x.Owner = this);
 		}
 	}
 
@@ -437,10 +434,10 @@ imagine a situation where a numeric ID field was incorrectly provided by a serve
 				// Parse the string
 				id = long.Parse(r.GetLiteralString());
 
-				// Skip the string literal not that we've handled it
+				// Skip the string literal now that we've handled it
 				r.NextToken();		
 
-				// Return true to suppress default processing of this key
+				// Return true to suppress default processing 
 				return true;
 			}
 
@@ -452,9 +449,9 @@ imagine a situation where a numeric ID field was incorrectly provided by a serve
 Note: although these event methods could have been implemented using reflection rather than interfaces,
 the use of interfaces is more discoverable through Intellisense/Autocomplete.
 
-## Cloning Objects
+## Cloning and Re-parsing Objects
 
-PetaJson includes a couple of helper functions for cloning object:
+PetaJson includes a couple of helper functions for cloning object by saving to Json and then reloading:
 
 	var person1 = new Person() { Name = "Mr Json Bourne"; }
 	var person2 = Json.Clone(person1);
@@ -463,6 +460,94 @@ You can also clone into an existing instance
 
 	var person3 = new Person();
 	Json.CloneInto(person3, person1);		// Copies from person1 to person3
+
+Similar to cloning is re-parsing. While cloning copies from one object to another of the same type,
+reparsing allows converting from one object type to another.  For example you can convert a dictionary
+of values into a person:
+
+	IDictionary<string,object> dictionary = getDictionaryFromSomewhere();
+	var person = Json.Reparse<Person>(dictionary);
+
+You can also go the other way:
+
+	var dictionary = Json.Reparse<IDictionary<string,object>>(person);
+
+## Bonus Dictionary Helpers
+
+PetaJson includes some super handy extensions to IDictionary<string,object> that make working
+with weakly typed JSON data easier.  Some of these methods are particularly handy when an app
+is using JSON to store configuration options or settings.
+
+Suppose we have the following JSON:
+
+	{
+		"settings":
+		{
+			"userSettings":
+			{
+				"username":"jsonbourne23",
+				"password":"123",
+				"email":"json@bourne.com",
+			},
+			"appSettings":
+			{
+				"firstRun":false,
+				"serverUrl":"http://www.toptensoftware.com",
+			}
+		}
+	}
+
+and we parse all this into a weakly typed dictionary:
+
+	var data = Json.ParseFile<IDictionary<string,object>>("settings.json");
+
+We can get a setting like this:
+
+	bool firstRun = data.GetPath<bool>("settings.appSettings.firstRun", true);
+
+Or set it like this:
+
+	data.SetPath("settings.appSettings.firstRun", false);
+
+SetPath creates the path using a set of Dictionary<string,object> if necessary:
+
+	var data = new Dictionary<String, object>();
+	data.SetPath("settings.appSettings.serverUrl", "http://whatever.com");
+
+GetPath can reparse if necessary to satify the requested type:
+
+	var userSettings = data.GetPath<UserSettings>("settings.userSettings", null);
+
+You can check if a path exists like this:
+
+	if (data.PathExists("settings.appSettings"))
+	{
+		// yep
+	}
+
+And finally, there's `T GetObjectAtPath<T>(string path)` which does a few things:
+
+1. Makes sure the path exists, and creates it if it doesn't
+2. If the path does exist, reparses whatever it finds there into type T.
+3. If the path doesn't exists, creates a new T
+4. Stores the T instance back into the dictionary at that path.
+
+So now we can work with parts of a weakly typed JSON dictionary with strong types.
+
+eg: 
+
+	var userSettings = data.GetObjectAtPath<UserSettings>("settings.userSettings");
+
+and saving data, will get the changes:
+
+	// Make a change
+	userSettings.email = "newemail@bourne.com";
+
+	// It sticks...
+	var json = Json.Format(data);
+	System.Diagnostic.Assert(json.IndexOf("newemail")>=0);
+
+Note: GetObjectAtPath only works with reference types, not structs.
 
 ## Options
 

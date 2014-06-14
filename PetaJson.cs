@@ -200,22 +200,61 @@ namespace PetaJson
         // Create a clone of an object
         public static T Clone<T>(T source)
         {
-            return (T)Clone((object)source);
+            return Reparse<T>(source);
         }
 
         // Create a clone of an object (untyped)
         public static object Clone(object source)
         {
-            if (source == null)
-                return null;
-
-            return Parse(Format(source), source.GetType());
+            return Reparse(typeof(object), source);
         }
 
         // Clone an object into another instance
-        public static void CloneInto<T>(T dest, T source)
+        public static void CloneInto(object dest, object source)
         {
-            ParseInto(Format(source), dest);
+            ReparseInto(dest, source);
+        }
+
+        // Reparse an object by writing to a stream and re-reading (possibly
+        // as a different type).
+        public static object Reparse(Type type, object source)
+        {
+            if (source == null)
+                return null;
+            var ms = new MemoryStream();
+            try
+            {
+                // Write
+                var w = new StreamWriter(ms);
+                Json.Write(w, source);
+                w.Flush();
+
+                // Read
+                ms.Seek(0, SeekOrigin.Begin);
+                var r = new StreamReader(ms);
+                return Json.Parse(r, type);
+            }
+            finally
+            {
+                ms.Dispose();
+            }
+        }
+
+        // Typed version of above
+        public static T Reparse<T>(object source)
+        {
+            return (T)Reparse(typeof(T), source);
+        }
+
+        // Reparse one object into another object 
+        public static void ReparseInto(object dest, object source)
+        {
+            using (var ms = new MemoryStream())
+            {
+                using (var w = new StreamWriter(ms)) Json.Write(w, source);
+                ms.Seek(0, SeekOrigin.Begin);
+                using (var r = new StreamReader(ms)) Json.ParseInto(r, dest);
+            }
         }
 
         // Register a callback that can format a value of a particular type into json
@@ -290,6 +329,83 @@ namespace PetaJson
         public static void SetIntoParserResolver(Func<Type, Action<IJsonReader, object>> resolver)
         {
             Internal.Reader._intoParserResolver = resolver;
+        }
+
+        public static bool WalkPath(this IDictionary<string, object> This, string Path, bool create, Func<IDictionary<string,object>,string, bool> leafCallback)
+        {
+            // Walk the path
+            var parts = Path.Split('.');
+            for (int i = 0; i < parts.Length-1; i++)
+            {
+                object val;
+                if (!This.TryGetValue(parts[i], out val))
+                {
+                    if (!create)
+                        return false;
+
+                    val = new Dictionary<string, object>();
+                    This[parts[i]] = val;
+                }
+                This = (IDictionary<string,object>)val;
+            }
+
+            // Process the leaf
+            return leafCallback(This, parts[parts.Length-1]);
+        }
+
+        public static bool PathExists(this IDictionary<string, object> This, string Path)
+        {
+            return This.WalkPath(Path, false, (dict, key) => dict.ContainsKey(key));
+        }
+
+        public static object GetPath(this IDictionary<string, object> This, Type type, string Path, object def)
+        {
+            This.WalkPath(Path, false, (dict, key) =>
+            {
+                object val;
+                if (dict.TryGetValue(key, out val))
+                {
+                    if (val == null)
+                        def = val;
+                    else if (type.IsAssignableFrom(val.GetType()))
+                        def = val;
+                    else
+                        def = Reparse(type, val);
+                }
+                return true;
+            });
+
+            return def;
+        }
+
+        // Ensure there's an object of type T at specified path
+        public static T GetObjectAtPath<T>(this IDictionary<string, object> This, string Path) where T:class,new()
+        {
+            T retVal = null;
+            This.WalkPath(Path, true, (dict, key) =>
+            {
+                object val;
+                dict.TryGetValue(key, out val);
+                retVal = val as T;
+                if (retVal == null)
+                {
+                    retVal = val == null ? new T() : Reparse<T>(val);
+                    dict[key] = retVal;
+                }
+                return true;
+            });
+
+            return retVal;
+        }
+
+        public static T GetPath<T>(this IDictionary<string, object> This, string Path, T def = default(T))
+        {
+            return (T)This.GetPath(typeof(T), Path, def);
+        }
+
+        public static void SetPath(this IDictionary<string, object> This, string Path, object value)
+        {
+            This.WalkPath(Path, true, (dict, key) => { dict[key] = value; return true; });
         }
 
         // Resolve passed options        

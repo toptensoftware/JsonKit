@@ -53,9 +53,11 @@
     <Compile Include="TestAbstractTypes.cs" />
     <Compile Include="TestConcreteFromInterface.cs" />
     <Compile Include="TestCustomFormat.cs" />
+    <Compile Include="TestDictionaryUtils.cs" />
     <Compile Include="TestNullableTypes.cs" />
     <Compile Include="TestOptions.cs" />
     <Compile Include="TestPrimitiveTypes.cs" />
+    <Compile Include="TestReparse.cs" />
     <Compile Include="TestsEvents.cs" />
     <Compile Include="TestsGeneral.cs" />
     <Compile Include="TestsReflection.cs" />
