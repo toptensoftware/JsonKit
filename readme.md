@@ -453,7 +453,7 @@ the use of interfaces is more discoverable through Intellisense/Autocomplete.
 
 ## Cloning and Re-parsing Objects
 
-PetaJson includes a couple of helper functions for cloning object by saving to Json and then reloading:
+PetaJson includes a couple of helper functions for cloning objects by saving to them to JSON and then reloading:
 
 	var person1 = new Person() { Name = "Mr Json Bourne"; }
 	var person2 = Json.Clone(person1);
@@ -679,6 +679,22 @@ eg: to write an array:
 		}
 	});
 
+## Performance
+
+Wondering about performance?  When Reflection.Emit is enabled, PetaJson is right up there with
+the best of them.  Some simple benchmarks serializing a long list of objects with a mix of 
+different primitive types yielded this: (smaller tick value = quicker, better)
+
+	PetaJson     format: 491865 ticks
+	Json.NET     format: 757618 ticks x1.54
+	ServiceStack format: 615091 ticks x1.25
+
+	PetaJson      parse: 1011818 ticks
+	Json.NET      parse: 1204574 ticks x1.19
+	ServiceStack  parse: 1177895 ticks x1.16
+
+Although this test shows PetaJson to be quicker, different data types may yield different results.  In 
+otherwords: I tested enough to make sure it wasn't ridiculously slow, but haven't done extensive benchmarks.
 
 ## License
 
