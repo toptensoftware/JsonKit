@@ -11,7 +11,7 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 * Custom formatting and parsing of any type
 * Support for serialization of polymorphic types
 * Utilities for cloning and reparsing objects into different types
-* Bonus IDictionary<string,object> extensions simplifies working with weakly typed JSON data.
+* Bonus `IDictionary<string,object>` extensions simplifies working with weakly typed JSON data.
 * Directly reads from TextReader and writes to TextWriter and any underlying stream
 * Simple set of custom attributes to control serialization
 * Optional non-strict parsing allows comments, non-quoted dictionary keys, trailing commas and hex literals (great for config files)
@@ -476,7 +476,7 @@ You can also go the other way:
 
 ## Bonus Dictionary Helpers
 
-PetaJson includes some super handy extensions to IDictionary<string,object> that make working
+PetaJson includes some super handy extensions to `IDictionary<string,object>` that make working
 with weakly typed JSON data easier.  Some of these methods are particularly handy when an app
 is using JSON to store configuration options or settings.
 
