@@ -118,8 +118,8 @@ namespace PetaJson
             catch (Exception x)
             {
 				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
-				Console.WriteLine("Exception thrown while parsing JSON at {0}\n{1}", loc, x.ToString()); 
-				throw new JsonParseException(x,loc);
+				Console.WriteLine("Exception thrown while parsing JSON at {0}, context:{1}\n{2}", loc, reader.Context, x.ToString()); 
+				throw new JsonParseException(x, reader.Context, loc);
             }
         }
 
@@ -147,8 +147,8 @@ namespace PetaJson
             catch (Exception x)
             {
 				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
-				Console.WriteLine("Exception thrown while parsing JSON at {0}\n{1}", loc, x.ToString()); 
-				throw new JsonParseException(x,loc);
+				Console.WriteLine("Exception thrown while parsing JSON at {0}, context:{1}\n{2}", loc, reader.Context, x.ToString()); 
+				throw new JsonParseException(x,reader.Context,loc);
             }
         }
 
@@ -249,11 +249,22 @@ namespace PetaJson
         // Reparse one object into another object 
         public static void ReparseInto(object dest, object source)
         {
-            using (var ms = new MemoryStream())
+            var ms = new MemoryStream();
+            try
             {
-                using (var w = new StreamWriter(ms)) Json.Write(w, source);
+                // Write
+                var w = new StreamWriter(ms);
+                Json.Write(w, source);
+                w.Flush();
+
+                // Read
                 ms.Seek(0, SeekOrigin.Begin);
-                using (var r = new StreamReader(ms)) Json.ParseInto(r, dest);
+                var r = new StreamReader(ms);
+                Json.ParseInto(r, dest);
+            }
+            finally
+            {
+                ms.Dispose();
             }
         }
 
@@ -510,12 +521,14 @@ namespace PetaJson
     // Exception thrown for any parse error
     public class JsonParseException : Exception
     {
-        public JsonParseException(Exception inner, JsonLineOffset position) : 
-            base(string.Format("Json parse error at {0} - {1}", position, inner.Message), inner)
+        public JsonParseException(Exception inner, string context, JsonLineOffset position) : 
+            base(string.Format("Json parse error at {0}, context {1} - {2}", position, context, inner.Message), inner)
         {
             Position = position;
+            Context = context;
         }
         public JsonLineOffset Position;
+        public string Context;
     }
 
     // Represents a line and character offset position in the source Json
@@ -662,6 +675,15 @@ namespace PetaJson
 
             Tokenizer _tokenizer;
             JsonOptions _options;
+            List<string> _contextStack = new List<string>();
+
+            public string Context
+            {
+                get
+                {
+                    return string.Join(".", _contextStack);
+                }
+            }
 
             static Action<IJsonReader, object> ResolveIntoParser(Type type)
             {
@@ -804,7 +826,10 @@ namespace PetaJson
                 // Enumerated type?
                 if (type.IsEnum)
                 {
-                    return ReadLiteral(literal => Enum.Parse(type, (string)literal));
+                    if (type.GetCustomAttributes(typeof(FlagsAttribute), false).Any())
+                        return ReadLiteral(literal => Enum.ToObject(type, literal));
+                    else
+                        return ReadLiteral(literal => Enum.Parse(type, (string)literal));
                 }
 
                 // Array?
@@ -1028,7 +1053,10 @@ namespace PetaJson
                     var pos = _tokenizer.CurrentTokenPosition;
 
                     // Call the callback, quit if cancelled
-                    if (!callback(key))
+                    _contextStack.Add(key);
+                    bool doDefaultProcessing = callback(key);
+                    _contextStack.RemoveAt(_contextStack.Count-1);
+                    if (!doDefaultProcessing)
                         return;
 
                     // If the callback didn't read anything from the tokenizer, then skip it ourself
@@ -1057,9 +1085,12 @@ namespace PetaJson
             {
                 _tokenizer.Skip(Token.OpenSquare);
 
+                int index = 0;
                 while (_tokenizer.CurrentToken != Token.CloseSquare)
                 {
+                    _contextStack.Add(string.Format("[{0}]", index));
                     callback();
+                    _contextStack.RemoveAt(_contextStack.Count-1);
 
                     if (_tokenizer.SkipIf(Token.Comma))
                     {
@@ -1342,7 +1373,10 @@ namespace PetaJson
                 // Enumerated type?
                 if (type.IsEnum)
                 {
-                    WriteStringLiteral(value.ToString());
+                    if (type.GetCustomAttributes(typeof(FlagsAttribute), false).Any())
+                        WriteRaw(Convert.ToUInt32(value).ToString(CultureInfo.InvariantCulture));
+                    else
+                        WriteStringLiteral(value.ToString());
                     return;
                 }
 
@@ -1356,6 +1390,21 @@ namespace PetaJson
                         {
                             WriteKey(key.ToString());
                             WriteValue(d[key]);
+                        }
+                    });
+                    return;
+                }
+
+                // Dictionary?
+                var dso = value as IDictionary<string,object>;
+                if (dso != null)
+                {
+                    WriteDictionary(() =>
+                    {
+                        foreach (var key in dso.Keys)
+                        {
+                            WriteKey(key.ToString());
+                            WriteValue(dso[key]);
                         }
                     });
                     return;
