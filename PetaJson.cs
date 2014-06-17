@@ -522,7 +522,7 @@ namespace PetaJson
     public class JsonParseException : Exception
     {
         public JsonParseException(Exception inner, string context, JsonLineOffset position) : 
-            base(string.Format("Json parse error at {0}, context {1} - {2}", position, context, inner.Message), inner)
+            base(string.Format("JSON parse error at {0}{1} - {2}", position, string.IsNullOrEmpty(context) ? "" : string.Format(", context {0}", context), inner.Message), inner)
         {
             Position = position;
             Context = context;
@@ -600,6 +600,7 @@ namespace PetaJson
 
     namespace Internal
     {
+        [Obfuscation(Exclude = true, ApplyToMembers = true)]
         public enum Token
         {
             EOF,
@@ -901,7 +902,7 @@ namespace PetaJson
                 }
 
                 // Give up
-                throw new InvalidDataException(string.Format("syntax error - unexpected token {0}", _tokenizer.CurrentToken));
+                throw new InvalidDataException(string.Format("syntax error, unexpected token {0}", _tokenizer.CurrentToken));
             }
 
             // Parse into an existing object instance
@@ -2113,7 +2114,7 @@ namespace PetaJson
                             // Comments not support in strict mode
                             if ((_options & JsonOptions.StrictParser) != 0)
                             {
-                                throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
+                                throw new InvalidDataException(string.Format("syntax error, unexpected character '{0}'", _currentChar));
                             }
 
                             // Process comment
@@ -2145,7 +2146,7 @@ namespace PetaJson
                                     break;
 
                                 default:
-                                    throw new InvalidDataException("syntax error - unexpected character after slash");
+                                    throw new InvalidDataException("syntax error, unexpected character after slash");
                             }
                             continue;
 
@@ -2200,7 +2201,7 @@ namespace PetaJson
 
                                 NextChar();
                             }
-                            throw new InvalidDataException("syntax error - unterminated string literal");
+                            throw new InvalidDataException("syntax error, unterminated string literal");
                         }
 
                         case '{': CurrentToken =  Token.OpenBrace; NextChar(); return;
@@ -2257,7 +2258,7 @@ namespace PetaJson
                     }
 
                     // What the?
-                    throw new InvalidDataException(string.Format("syntax error - unexpected character '{0}'", _currentChar));
+                    throw new InvalidDataException(string.Format("syntax error, unexpected character '{0}'", _currentChar));
                 }
             }
 
@@ -2366,7 +2367,7 @@ namespace PetaJson
                 }
 
                 if (char.IsLetter(_currentChar))
-                    throw new InvalidDataException(string.Format("syntax error - invalid character following number '{0}'", _sb.ToString()));
+                    throw new InvalidDataException(string.Format("syntax error, invalid character following number '{0}'", _sb.ToString()));
 
                 // Setup token
                 String = _sb.ToString();
@@ -2392,7 +2393,7 @@ namespace PetaJson
             {
                 if (tokenRequired != CurrentToken)
                 {
-                    throw new InvalidDataException(string.Format("syntax error - expected {0} found {1}", tokenRequired, CurrentToken));
+                    throw new InvalidDataException(string.Format("syntax error, expected {0} found {1}", tokenRequired, CurrentToken));
                 }
             }
 
@@ -3038,13 +3039,18 @@ namespace PetaJson
             // and then parses into it.
             static void RegisterIntoParser(Type type, Action<IJsonReader, object> parseInto)
             {
+                // Check type has a parameterless constructor
+                var con = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null);
+                if (con == null)
+                    return;
+
                 // Create a dynamic method that can do the work
                 var method = new DynamicMethod("dynamic_factory", typeof(object), new Type[] { typeof(IJsonReader), typeof(Action<IJsonReader, object>) }, true);
                 var il = method.GetILGenerator();
 
                 // Create the new object
                 var locObj = il.DeclareLocal(typeof(object));
-                il.Emit(OpCodes.Newobj, type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[0], null));
+                il.Emit(OpCodes.Newobj, con);
 
                 il.Emit(OpCodes.Dup);               // For return value
 
