@@ -200,13 +200,13 @@ namespace PetaJson
         // Create a clone of an object
         public static T Clone<T>(T source)
         {
-            return Reparse<T>(source);
+            return (T)Reparse(source.GetType(), source);
         }
 
         // Create a clone of an object (untyped)
         public static object Clone(object source)
         {
-            return Reparse(typeof(object), source);
+            return Reparse(source.GetType(), source);
         }
 
         // Clone an object into another instance
