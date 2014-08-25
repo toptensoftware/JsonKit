@@ -914,6 +914,7 @@ namespace PetaJson
                 if (_tokenizer.CurrentToken == Token.Literal && _tokenizer.LiteralKind == LiteralKind.Null)
                 {
                     throw new InvalidOperationException("can't parse null into existing instance");
+                    //return;
                 }
 
                 var type = into.GetType();
@@ -1269,6 +1270,7 @@ namespace PetaJson
 
             public void WriteStringLiteral(string str)
             {
+                _atStartOfLine = false;
                 if (str == null)
                 {
                     _writer.Write("null");
@@ -1348,6 +1350,8 @@ namespace PetaJson
             // Write any value
             public void WriteValue(object value)
             {
+                _atStartOfLine = false;
+
                 // Special handling for null
                 if (value == null)
                 {
