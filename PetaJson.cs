@@ -616,6 +616,22 @@ namespace PetaJson
             Comma,
         }
 
+        // Helper to create instances but include the type name in the thrown exception
+        public static class DecoratingActivator
+        {
+            public static object CreateInstance(Type t)
+            {
+                try
+                {
+                    return Activator.CreateInstance(t);
+                }
+                catch (Exception x)
+                {
+                    throw new InvalidOperationException(string.Format("Failed to create instance of type '{0}'", t.FullName), x);
+                }
+            }
+        }
+
         public class Reader : IJsonReader
         {
             static Reader()
@@ -722,7 +738,7 @@ namespace PetaJson
 
                 return (r, t) =>
                 {
-                    var into = Activator.CreateInstance(type);
+                    var into = DecoratingActivator.CreateInstance(type);
                     r.ParseInto(into);
                     return into;
                 };
@@ -819,7 +835,7 @@ namespace PetaJson
                 Action<IJsonReader, object> intoParser;
                 if (Reader._intoParsers.TryGetValue(type, out intoParser))
                 {
-                    var into = Activator.CreateInstance(type);
+                    var into = DecoratingActivator.CreateInstance(type);
                     ParseInto(into);
                     return into;
                 }
@@ -838,7 +854,7 @@ namespace PetaJson
                 {
                     // First parse as a List<>
                     var listType = typeof(List<>).MakeGenericType(type.GetElementType());
-                    var list = Activator.CreateInstance(listType);
+                    var list = DecoratingActivator.CreateInstance(listType);
                     ParseInto(list);
 
                     return listType.GetMethod("ToArray").Invoke(list, null);
@@ -896,7 +912,7 @@ namespace PetaJson
                 // Call reference type resolver
                 if (type.IsClass && type != typeof(object))
                 {
-                    var into = Activator.CreateInstance(type);
+                    var into = DecoratingActivator.CreateInstance(type);
                     ParseInto(into);
                     return into;
                 }
@@ -2824,7 +2840,7 @@ namespace PetaJson
                     Func<IJsonReader, Type, object> parser = (reader, Type) =>
                     {
                         // Create pseudobox (ie: new PseudoBox<Type>)
-                        var box = Activator.CreateInstance(boxType);
+                        var box = DecoratingActivator.CreateInstance(boxType);
 
                         // Call IJsonLoading
                         if (invokeLoading != null)
