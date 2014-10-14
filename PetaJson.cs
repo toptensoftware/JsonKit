@@ -1856,7 +1856,7 @@ namespace PetaJson
                 var pi = mi as PropertyInfo;
                 if (pi != null)
                 {
-                    var gm = pi.GetGetMethod();
+                    var gm = pi.GetGetMethod(true);
                     return (gm != null && gm.IsPublic);
                 }
 
@@ -2525,7 +2525,7 @@ namespace PetaJson
                     {
                         // Ignore write only properties
                         var pi = m.Member as PropertyInfo;
-                        if (pi != null && pi.GetGetMethod() == null)
+                        if (pi != null && pi.GetGetMethod(true) == null)
                         {
                             continue;
                         }
@@ -2563,9 +2563,9 @@ namespace PetaJson
                         {
                             // Call property's get method
                             if (type.IsValueType)
-                                il.Emit(OpCodes.Call, pi.GetGetMethod());
+                                il.Emit(OpCodes.Call, pi.GetGetMethod(true));
                             else
-                                il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
+                                il.Emit(OpCodes.Callvirt, pi.GetGetMethod(true));
 
                             // If we need the address then store in a local and take it's address
                             if (NeedValueAddress)
@@ -2800,7 +2800,7 @@ namespace PetaJson
                         // Ignore write only properties
                         var pi = m.Member as PropertyInfo;
                         var fi = m.Member as FieldInfo;
-                        if (pi != null && pi.GetSetMethod() == null)
+                        if (pi != null && pi.GetSetMethod(true) == null)
                         {
                             continue;
                         }
@@ -2819,7 +2819,7 @@ namespace PetaJson
 
                         // Assign it
                         if (pi != null)
-                            il.Emit(OpCodes.Call, pi.GetSetMethod());
+                            il.Emit(OpCodes.Call, pi.GetSetMethod(true));
                         if (fi != null)
                             il.Emit(OpCodes.Stfld, fi);
 
@@ -2947,13 +2947,13 @@ namespace PetaJson
                     // Ignore write only properties
                     var pi = m.Member as PropertyInfo;
                     var fi = m.Member as FieldInfo;
-                    if (pi != null && pi.GetSetMethod() == null)
+                    if (pi != null && pi.GetSetMethod(true) == null)
                     {
                         continue;
                     }
 
                     // Ignore read only properties that has KeepInstance attribute
-                    if (pi != null && pi.GetGetMethod() == null && m.KeepInstance)
+                    if (pi != null && pi.GetGetMethod(true) == null && m.KeepInstance)
                     {
                         continue;
                     }
@@ -2972,7 +2972,7 @@ namespace PetaJson
                         // Get existing existing instance
                         il.Emit(OpCodes.Dup);
                         if (pi != null)
-                            il.Emit(OpCodes.Callvirt, pi.GetGetMethod());
+                            il.Emit(OpCodes.Callvirt, pi.GetGetMethod(true));
                         else
                             il.Emit(OpCodes.Ldfld, fi);
 
@@ -3003,7 +3003,7 @@ namespace PetaJson
 
                     // Assign it
                     if (pi != null)
-                        il.Emit(OpCodes.Callvirt, pi.GetSetMethod());
+                        il.Emit(OpCodes.Callvirt, pi.GetSetMethod(true));
                     if (fi != null)
                         il.Emit(OpCodes.Stfld, fi);
 
