@@ -1838,7 +1838,7 @@ namespace PetaJson
                 {
                     // Is this a generic list?
                     if (t.IsGenericType && t.GetGenericTypeDefinition() == tItf)
-                        return type;
+                        return t;
                 }
 
                 return null;
