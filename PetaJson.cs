@@ -844,7 +844,16 @@ namespace PetaJson
                 if (type.IsEnum)
                 {
                     if (type.GetCustomAttributes(typeof(FlagsAttribute), false).Any())
-                        return ReadLiteral(literal => Enum.ToObject(type, literal));
+                        return ReadLiteral(literal => {
+                            try
+                            {
+                                return Enum.Parse(type, (string)literal);
+                            }
+                            catch
+                            {
+                                return Enum.ToObject(type, literal);
+                            }
+                        });
                     else
                         return ReadLiteral(literal => Enum.Parse(type, (string)literal));
                 }
