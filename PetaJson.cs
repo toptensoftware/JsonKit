@@ -587,6 +587,15 @@ namespace PetaJson
             get;
             set;
         }
+
+        // If true, the property will be loaded, but not saved
+        // Use to upgrade deprecated persisted settings, but not
+        // write them back out again
+        public bool Deprecated
+        {
+            get;
+            set;
+        }
     }
 
     // See comments for JsonAttribute above
@@ -1478,6 +1487,11 @@ namespace PetaJson
             // True if should keep existing instance (reference types only)
             public bool KeepInstance;
 
+            // True if deprecated
+            public bool Deprecated;
+
+            
+
             // Reflected member info
             MemberInfo _mi;
             public MemberInfo Member
@@ -1573,7 +1587,7 @@ namespace PetaJson
                     if (writing != null)
                         writing.OnJsonWriting(w);
 
-                    foreach (var jmi in Members)
+                    foreach (var jmi in Members.Where(x=>!x.Deprecated))
                     {
                         w.WriteKeyNoEscaping(jmi.JsonKey);
                         w.WriteValue(jmi.GetValue(val));
@@ -1716,6 +1730,7 @@ namespace PetaJson
                                     Member = mi,
                                     JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
                                     KeepInstance = attr.KeepInstance,
+                                    Deprecated = attr.Deprecated,
                                 };
                             }
 
@@ -2532,6 +2547,12 @@ namespace PetaJson
                     // Process all members
                     foreach (var m in ri.Members)
                     {
+                        // Dont save deprecated properties
+                        if (m.Deprecated)
+                        {
+                            continue;
+                        }
+
                         // Ignore write only properties
                         var pi = m.Member as PropertyInfo;
                         if (pi != null && pi.GetGetMethod(true) == null)
