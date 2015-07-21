@@ -607,6 +607,34 @@ namespace PetaJson
         }
     }
 
+
+	// Apply to enum values to specify which enum value to select
+	// if the supplied json value doesn't match any.
+	// If not found throws an exception
+	// eg, any unknown values in the json will be mapped to Fruit.unknown
+	//
+	//	 [JsonUnknown(Fruit.unknown)]
+	//   enum Fruit
+	//   {
+	// 		unknown,
+	//      Apple,
+	//      Pear,
+	//	 }
+	[AttributeUsage(AttributeTargets.Enum)]
+	public class JsonUnknownAttribute : Attribute
+	{
+		public JsonUnknownAttribute(object unknownValue)
+		{
+			UnknownValue = unknownValue;
+		}
+
+		public object UnknownValue
+		{
+			get;
+			private set;
+		}
+	}
+
     namespace Internal
     {
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
@@ -864,7 +892,22 @@ namespace PetaJson
                             }
                         });
                     else
-                        return ReadLiteral(literal => Enum.Parse(type, (string)literal));
+						return ReadLiteral(literal => {
+							
+							try
+							{
+								return Enum.Parse(type, (string)literal);
+							}
+							catch (Exception x)
+							{
+								var attr = type.GetCustomAttributes(typeof(JsonUnknownAttribute), false).FirstOrDefault();
+								if (attr==null)
+									throw x;
+
+								return ((JsonUnknownAttribute)attr).UnknownValue;
+							}
+
+						});
                 }
 
                 // Array?
