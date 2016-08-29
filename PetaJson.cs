@@ -898,11 +898,11 @@ namespace PetaJson
 							{
 								return Enum.Parse(type, (string)literal);
 							}
-							catch (Exception x)
+							catch (Exception)
 							{
 								var attr = type.GetCustomAttributes(typeof(JsonUnknownAttribute), false).FirstOrDefault();
 								if (attr==null)
-									throw x;
+									throw;
 
 								return ((JsonUnknownAttribute)attr).UnknownValue;
 							}
