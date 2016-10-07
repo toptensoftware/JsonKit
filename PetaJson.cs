@@ -2013,7 +2013,11 @@ namespace PetaJson
                         case LiteralKind.True: return true;
                         case LiteralKind.String: return String;
                         case LiteralKind.SignedInteger: return long.Parse(String, CultureInfo.InvariantCulture);
-                        case LiteralKind.UnsignedInteger: return ulong.Parse(String, CultureInfo.InvariantCulture);
+                        case LiteralKind.UnsignedInteger:
+                            if (String.StartsWith("0x") || String.StartsWith("0X"))
+                                return Convert.ToUInt64(String.Substring(2), 16);
+                            else
+                                return ulong.Parse(String, CultureInfo.InvariantCulture);
                         case LiteralKind.FloatingPoint: return double.Parse(String, CultureInfo.InvariantCulture);
                     }
                     return null;
