@@ -86,6 +86,42 @@ namespace PetaJson
             writer.WriteValue(o);
         }
 
+        static void DeleteFile(string filename)
+        {
+            try
+            {
+                System.IO.File.Delete(filename);
+            }
+            catch
+            {
+                // Don't care
+            }
+        }
+
+        // Write a file atomically by writing to a temp file and then renaming it - prevents corrupted files if crash 
+        // in middle of writing file.
+        public static void WriteFileAtomic(string filename, object o, JsonOptions options = JsonOptions.None)
+        {
+            var tempName = filename + ".tmp";
+
+            try
+            {
+                // Write the temp file
+                WriteFile(tempName, o, options);
+
+                // Delete the original file
+                DeleteFile(filename);
+
+                // Rename the temp file
+                System.IO.File.Move(tempName, filename);
+            }
+            catch
+            {
+                DeleteFile(tempName);
+                throw;
+            }
+        }
+
         // Write an object to a file
         public static void WriteFile(string filename, object o, JsonOptions options = JsonOptions.None)
         {
