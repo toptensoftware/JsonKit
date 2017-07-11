@@ -118,35 +118,43 @@ namespace PetaJson
                 // Write the temp file
                 WriteFile(tempName, o, (options | JsonOptions.Flush));
 
-                bool savePreviousVersion = false;
-
-                if ((options & JsonOptions.AutoSavePreviousVersion)!=0)
+                if (System.IO.File.Exists(filename))
                 {
-                    savePreviousVersion = SavePreviousVersions;
-                }
-                else if ((options & JsonOptions.SavePreviousVersion)!=0)
-                {
-                    savePreviousVersion = true;
-                }
+                    bool savePreviousVersion = false;
 
-
-                // Work out backup filename
-                if (savePreviousVersion)
-                {
-                    // Make sure have a backup filename
-                    if (backupFilename == null)
+                    if ((options & JsonOptions.AutoSavePreviousVersion)!=0)
                     {
-                        backupFilename = filename + ".previous";
+                        savePreviousVersion = SavePreviousVersions;
                     }
+                    else if ((options & JsonOptions.SavePreviousVersion)!=0)
+                    {
+                        savePreviousVersion = true;
+                    }
+
+
+                    // Work out backup filename
+                    if (savePreviousVersion)
+                    {
+                        // Make sure have a backup filename
+                        if (backupFilename == null)
+                        {
+                            backupFilename = filename + ".previous";
+                        }
+                    }
+                    else
+                    {
+                        // No backup
+                        backupFilename = null;
+                    }
+
+                    // Replace it
+                    File.Replace(tempName, filename, backupFilename);
                 }
                 else
                 {
-                    // No backup
-                    backupFilename = null;
+                    // Rename it
+                    File.Move(tempName, filename);
                 }
-
-                // Replace it
-                File.Replace(tempName, filename, backupFilename);
             }
             catch
             {
