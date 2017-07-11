@@ -48,6 +48,9 @@ namespace PetaJson
         DontWriteWhitespace = 0x00000002,
         StrictParser = 0x00000004,
         NonStrictParser = 0x00000008,
+        Flush = 0x00000010,
+        AutoSavePreviousVersion = 0x00000020,       // Use "SavePreviousVersions" static property
+        SavePreviousVersion = 0x00000040,           // Always save previous version
     }
 
     // API
@@ -98,22 +101,52 @@ namespace PetaJson
             }
         }
 
+        public static bool SavePreviousVersions
+        {
+            get;
+            set;
+        }
+
         // Write a file atomically by writing to a temp file and then renaming it - prevents corrupted files if crash 
         // in middle of writing file.
-        public static void WriteFileAtomic(string filename, object o, JsonOptions options = JsonOptions.None)
+        public static void WriteFileAtomic(string filename, object o, JsonOptions options = JsonOptions.None, string backupFilename = null)
         {
             var tempName = filename + ".tmp";
 
             try
             {
                 // Write the temp file
-                WriteFile(tempName, o, options);
+                WriteFile(tempName, o, (options | JsonOptions.Flush));
 
-                // Delete the original file
-                DeleteFile(filename);
+                bool savePreviousVersion = false;
 
-                // Rename the temp file
-                System.IO.File.Move(tempName, filename);
+                if ((options & JsonOptions.AutoSavePreviousVersion)!=0)
+                {
+                    savePreviousVersion = SavePreviousVersions;
+                }
+                else if ((options & JsonOptions.SavePreviousVersion)!=0)
+                {
+                    savePreviousVersion = true;
+                }
+
+
+                // Work out backup filename
+                if (savePreviousVersion)
+                {
+                    // Make sure have a backup filename
+                    if (backupFilename == null)
+                    {
+                        backupFilename = filename + ".previous";
+                    }
+                }
+                else
+                {
+                    // No backup
+                    backupFilename = null;
+                }
+
+                // Replace it
+                File.Replace(tempName, filename, backupFilename);
             }
             catch
             {
@@ -128,6 +161,12 @@ namespace PetaJson
             using (var w = new StreamWriter(filename))
             {
                 Write(w, o, options);
+
+                if ((options & JsonOptions.Flush) != 0)
+                {
+                    w.Flush();
+                    w.BaseStream.Flush();
+                }
             }
         }
 
