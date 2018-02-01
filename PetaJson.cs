@@ -148,7 +148,14 @@ namespace PetaJson
                     }
 
                     // Replace it
-                    File.Replace(tempName, filename, backupFilename);
+                    try
+                    {
+                        File.Replace(tempName, filename, backupFilename);
+                    }
+                    catch (System.IO.IOException x)
+                    {
+                        throw new System.IO.IOException(string.Format("Failed to replace temp file {0} with {1} and backup {2}, reason {3}", tempName, filename, backupFilename, x.Message), x);
+                    }
                 }
                 else
                 {
