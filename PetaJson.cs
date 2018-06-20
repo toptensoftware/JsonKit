@@ -788,10 +788,29 @@ namespace PetaJson
                     {
                         case LiteralKind.SignedInteger:
                         case LiteralKind.UnsignedInteger:
+                            {
+                                var str = reader.GetLiteralString();
+                                if (str.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
+                                {
+                                    var tempValue = Convert.ToUInt64(str.Substring(2), 16);
+                                    object val = Convert.ChangeType(tempValue, type, CultureInfo.InvariantCulture);
+                                    reader.NextToken();
+                                    return val;
+                                }
+                                else
+                                {
+                                    object val = Convert.ChangeType(str, type, CultureInfo.InvariantCulture);
+                                    reader.NextToken();
+                                    return val;
+                                }
+                            }
+
                         case LiteralKind.FloatingPoint:
-                            object val = Convert.ChangeType(reader.GetLiteralString(), type, CultureInfo.InvariantCulture);
-                            reader.NextToken();
-                            return val;
+                            {
+                                object val = Convert.ChangeType(reader.GetLiteralString(), type, CultureInfo.InvariantCulture);
+                                reader.NextToken();
+                                return val;
+                            }
                     }
                     throw new InvalidDataException("expected a numeric literal");
                 };
