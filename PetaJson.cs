@@ -587,6 +587,22 @@ namespace PetaJson
         FloatingPoint,
     }
 
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]
+    public enum Token
+    {
+        EOF,
+        Identifier,
+        Literal,
+        OpenBrace,
+        CloseBrace,
+        OpenSquare,
+        CloseSquare,
+        Equal,
+        Colon,
+        SemiColon,
+        Comma,
+    }
+
     // Passed to registered parsers
     [Obfuscation(Exclude=true, ApplyToMembers=true)]
     public interface IJsonReader
@@ -595,6 +611,7 @@ namespace PetaJson
         T Parse<T>();
         void ParseInto(object into);
 
+        Token CurrentToken { get; }
         object ReadLiteral(Func<object, object> converter);
         void ParseDictionary(Action<string> callback);
         void ParseArray(Action callback);
@@ -737,21 +754,8 @@ namespace PetaJson
 
     namespace Internal
     {
-        [Obfuscation(Exclude = true, ApplyToMembers = true)]
-        public enum Token
-        {
-            EOF,
-            Identifier,
-            Literal,
-            OpenBrace,
-            CloseBrace,
-            OpenSquare,
-            CloseSquare,
-            Equal,
-            Colon,
-            SemiColon,
-            Comma,
-        }
+        class CancelReaderException : Exception
+        { }
 
         // Helper to create instances but include the type name in the thrown exception
         public static class DecoratingActivator
@@ -836,6 +840,8 @@ namespace PetaJson
                 });
                 _parsers.Set(typeof(byte[]), (reader, type) =>
                 {
+                    if (reader.CurrentToken == Token.OpenSquare)
+                        throw new CancelReaderException();
                     return reader.ReadLiteral(literal => Convert.FromBase64String((string)Convert.ChangeType(literal, typeof(string), CultureInfo.InvariantCulture)));
                 });
             }
@@ -905,6 +911,12 @@ namespace PetaJson
                 get { return _tokenizer.CurrentTokenPosition; }
             }
 
+            public Token CurrentToken
+            {
+                get { return _tokenizer.CurrentToken; }
+            }
+
+
             // ReadLiteral is implemented with a converter callback so that any
             // errors on converting to the target type are thrown before the tokenizer
             // is advanced to the next token.  This ensures error location is reported 
@@ -940,7 +952,14 @@ namespace PetaJson
                 Func<IJsonReader, Type, object> parser;
                 if (Reader._parsers.TryGetValue(type, out parser))
                 {
-                    return parser(this, type);
+                    try
+                    {
+                        return parser(this, type);
+                    }
+                    catch (CancelReaderException)
+                    {
+                        // Reader aborted trying to read this format
+                    }
                 }
 
                 // See if we have factory
