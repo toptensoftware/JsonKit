@@ -1945,7 +1945,7 @@ namespace PetaJson
                 }
 
                 // Must have some members
-                if (!members.Any())
+                if (!members.Any() && !Attribute.IsDefined(type, typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
                     return null;
 
                 // Create reflection info
