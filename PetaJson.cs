@@ -1059,6 +1059,18 @@ namespace PetaJson
                     return listType.GetMethod("ToArray").Invoke(list, null);
                 }
 
+                // IEnumerable
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    // First parse as a List<>
+                    var declType = type.GetGenericArguments()[0];
+                    var listType = typeof(List<>).MakeGenericType(declType);
+                    var list = DecoratingActivator.CreateInstance(listType);
+                    ParseInto(list);
+
+                    return list;
+                }
+
                 // Convert interfaces to concrete types
                 if (type.IsInterface)
                     type = Utils.ResolveInterfaceToClass(type);
