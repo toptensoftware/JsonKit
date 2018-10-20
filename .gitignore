@@ -1,5 +1,7 @@
+.vs
+Build
 bin
 obj
 *.suo
 *.nupkg
-
+codesign_password.txt

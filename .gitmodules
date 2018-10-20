@@ -1,3 +1,6 @@
 [submodule "petatest"]
 	path = petatest
 	url = https://github.com/toptensoftware/PetaTest.git
+[submodule "BuildTools"]
+	path = BuildTools
+	url = git@bitbucket.org:toptensoftware/BuildTools
