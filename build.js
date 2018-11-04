@@ -39,4 +39,5 @@ if (release)
 }
 
 
-bt.copy("build\\*.nupkg", "\\\\cool\\public\\ToptenNuget")
+bt.nupush(`.\\build\\*.${bt.options.version.build}.nupkg`);
+
