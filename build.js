@@ -31,7 +31,7 @@ if (release)
 
 	bt.signfile([
         "Build\\Release\\PetaJson\\netcoreapp2.0\\PetaJson.dll",
-        "Build\\Release\\PetaJson\\net461\\PetaJson.dll",
+        "Build\\Release\\PetaJson\\net46\\PetaJson.dll",
 
     ], "PetaJson JSON Serialization Library");
 

@@ -14,18 +14,18 @@
   <files>
 
     <!-- .NET Framework -->
-    <file src=".\Build\Debug\PetaJson\net461\PetaJson.*" target="lib/net461" />
+    <file src=".\Build\Debug\PetaJson\net46\PetaJson.*" target="lib/net46" />
 
     <!-- netstandard2.0 -->
-    <file src=".\Build\Debug\PetaJson\netcoreapp2.0\PetaJson.*" target="ref/netstandard2.0" />
+    <file src=".\Build\Debug\PetaJson\net46\PetaJson.*" target="ref/netstandard2.0" />
 
     <!-- netcore2.0 -->
     <file src=".\Build\Debug\PetaJson\netcoreapp2.0\PetaJson.*" target="ref/netcoreapp2.0" />
     <file src=".\Build\Debug\PetaJson\netcoreapp2.0\PetaJson.*" target="runtimes/any/lib/netcoreapp2.0" />
 
-    <!-- net461 -->
-    <file src=".\Build\Debug\PetaJson\net461\PetaJson.*" target="ref/net461" />
-    <file src=".\Build\Debug\PetaJson\net461\PetaJson.*" target="runtimes/any/lib/net461" />
+    <!-- net46 -->
+    <file src=".\Build\Debug\PetaJson\net46\PetaJson.*" target="ref/net46" />
+    <file src=".\Build\Debug\PetaJson\net46\PetaJson.*" target="runtimes/any/lib/net46" />
 
   </files>
 </package>
