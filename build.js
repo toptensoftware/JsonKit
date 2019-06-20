@@ -18,7 +18,7 @@ if (bt.options.official)
     bt.clock_version();
 
     // Run Tests
-    bt.dntest("Release", "JsonKit.Test");
+    bt.dntest("Release", "Topten.JsonKit.Test");
 
     // Force clean
     bt.options.clean = true;
@@ -32,11 +32,11 @@ bt.dnbuild("Release", "JsonKit");
 if (bt.options.official || bt.options.nuget)
 {
 	bt.signfile([
-        "Build\\Release\\JsonKit\\netcoreapp2.0\\JsonKit.dll",
-        "Build\\Release\\JsonKit\\net46\\JsonKit.dll",
+        "Build\\Release\\Topten.JsonKit\\netcoreapp2.0\\Topten.JsonKit.dll",
+        "Build\\Release\\Topten.JsonKit\\net46\\Topten.JsonKit.dll",
     ], "JsonKit JSON Serialization Library");
 
-    bt.nupack("JsonKit.nuspec", "./Build");
+    bt.nupack("Topten.JsonKit.nuspec", "./Build");
 }
 
 if (bt.options.official)

@@ -3,13 +3,13 @@
 using System;
 using System.Reflection;
 [assembly: AssemblyCopyright("Copyright © 2014-2019 Topten Software. All Rights Reserved")]
-[assembly: AssemblyVersion("1.1.114")]
-[assembly: AssemblyFileVersion("1.1.114")]
+[assembly: AssemblyVersion("1.1.115")]
+[assembly: AssemblyFileVersion("1.1.115")]
 [assembly: AssemblyCompany("Topten Software")]
 [assembly: AssemblyProduct("JsonKit")]
 
 static class BuildInfo
 {
-	public static DateTime Date = new DateTime(2019, 6, 20, 5, 20, 8, DateTimeKind.Utc);
+	public static DateTime Date = new DateTime(2019, 6, 20, 5, 40, 30, DateTimeKind.Utc);
 }
 	
