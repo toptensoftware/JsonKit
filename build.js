@@ -26,7 +26,7 @@ if (bt.options.official)
 }
 
 // Build
-bt.dnbuild("Release", "JsonKit");
+bt.dnbuild("Release", "Topten.JsonKit");
 
 // Build NuGet Package?
 if (bt.options.official || bt.options.nuget)
