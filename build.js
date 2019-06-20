@@ -1,43 +1,49 @@
 var bt = require('./BuildTools/buildTools.js')
 
-// Crack /debug /release and /all options
-var debug = bt.options.switches.debug || bt.options.switches.all;
-var release = bt.options.switches.release || bt.options.switches.all;
-if (!debug && !release)
-	release = true;
+bt.options.companyName = "Topten Software";
+bt.options.codeSignCertificate = "C:\\Users\\brad\\dropbox\\topten\\ToptenCodeSigningCertificate.pfx";
+bt.options.codeSignPasswordFile = "C:\\Users\\brad\\dropbox\\topten\\codesign_password.txt";
+bt.symStorePath = "\\\\cool\\public\\ToptenSymbols";
 
-// Clock version
+
+// Load version info
 bt.version();
-bt.clock_version();
 
-// Don't bother cleaning if we're not doing a release build
-if (release)
+if (bt.options.official)
 {
-	bt.options.clean = true;
-	bt.clean(".\\Build");
+    // Check everything committed
+    bt.git_check();
+
+    // Clock version
+    bt.clock_version();
+
+    // Run Tests
+    bt.dntest("Release", "PetaJson.Test");
+
+    // Force clean
+    bt.options.clean = true;
+    bt.clean("./Build");
 }
 
-// Debug build
-if (debug)
-{
-	bt.dnbuild("Debug");
-	bt.nupack("PetaJson.Debug.nuspec", ".\\Build");
-}
+// Build
+bt.dnbuild("Release", "PetaJson");
 
-// Release build
-if (release)
+// Build NuGet Package?
+if (bt.options.official || bt.options.nuget)
 {
-	bt.dnbuild("Release");
-
 	bt.signfile([
         "Build\\Release\\PetaJson\\netcoreapp2.0\\PetaJson.dll",
         "Build\\Release\\PetaJson\\net46\\PetaJson.dll",
-
     ], "PetaJson JSON Serialization Library");
 
-	bt.nupack("PetaJson.nuspec", ".\\Build");
+    bt.nupack("PetaJson.nuspec", "./Build");
 }
 
+if (bt.options.official)
+{
+    // Tag and commit
+    bt.git_tag();
 
-bt.nupush(`.\\build\\*.${bt.options.version.build}.nupkg`);
-
+    // Push nuget package
+    bt.nupush(`./build/*.${bt.options.version.build}.nupkg`, "http://nuget.toptensoftware.com/v3/index.json");
+}
