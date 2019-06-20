@@ -21,5 +21,6 @@ using System;
 namespace PetaJson
 {
     class CancelReaderException : Exception
-    { }
+    {
+    }
 }

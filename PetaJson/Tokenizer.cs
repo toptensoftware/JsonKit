@@ -43,11 +43,11 @@ namespace PetaJson
         private int _bufUsed;
         private StringBuilder _rewindBuffer;
         private int _rewindBufferPos;
-        private JsonLineOffset _currentCharPos;
+        private LineOffset _currentCharPos;
         private char _currentChar;
         private Stack<ReaderState> _bookmarks = new Stack<ReaderState>();
 
-        public JsonLineOffset CurrentTokenPosition;
+        public LineOffset CurrentTokenPosition;
         public Token CurrentToken;
         public LiteralKind LiteralKind;
         public string String;
@@ -122,8 +122,8 @@ namespace PetaJson
                 tokenizer.LiteralKind = _literalKind;
             }
 
-            private JsonLineOffset _currentCharPos;
-            private JsonLineOffset _currentTokenPos;
+            private LineOffset _currentCharPos;
+            private LineOffset _currentTokenPos;
             private char _currentChar;
             private Token _currentToken;
             private LiteralKind _literalKind;

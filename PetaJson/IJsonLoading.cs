@@ -17,13 +17,6 @@
 // Define PETAJSON_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
 
 using System.Reflection;
-#if !PETAJSON_NO_DYNAMIC
-#endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
 
 
 namespace PetaJson

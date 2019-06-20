@@ -25,11 +25,6 @@ using System.Collections;
 #if !PETAJSON_NO_DYNAMIC
 using System.Dynamic;
 #endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
 
 
 namespace PetaJson
@@ -167,7 +162,7 @@ namespace PetaJson
             };
         }
 
-        public JsonLineOffset CurrentTokenPosition
+        public LineOffset CurrentTokenPosition
         {
             get { return _tokenizer.CurrentTokenPosition; }
         }

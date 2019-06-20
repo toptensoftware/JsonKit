@@ -16,19 +16,11 @@
 // Define PETAJSON_NO_EMIT to disable Reflection.Emit
 // Define PETAJSON_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
 
-#if !PETAJSON_NO_DYNAMIC
-#endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
-
 
 namespace PetaJson
 {
     // Represents a line and character offset position in the source Json
-    public struct JsonLineOffset
+    public struct LineOffset
     {
         public int Line;
         public int Offset;

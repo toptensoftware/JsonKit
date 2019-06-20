@@ -18,13 +18,6 @@
 
 using System;
 using System.Reflection;
-#if !PETAJSON_NO_DYNAMIC
-#endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
 
 
 namespace PetaJson
@@ -40,8 +33,6 @@ namespace PetaJson
 
         // True if deprecated
         public bool Deprecated;
-
-            
 
         // Reflected member info
         MemberInfo _mi;

@@ -21,13 +21,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Globalization;
-#if !PETAJSON_NO_DYNAMIC
-#endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
 
 
 namespace PetaJson

@@ -17,27 +17,19 @@
 // Define PETAJSON_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
 
 using System;
-#if !PETAJSON_NO_DYNAMIC
-#endif
-#if !PETAJSON_NO_EMIT
-#endif
-#if !PETAJSON_NO_DATACONTRACT
-#endif
-
-
 
 namespace PetaJson
 {
     // Exception thrown for any parse error
     public class JsonParseException : Exception
     {
-        public JsonParseException(Exception inner, string context, JsonLineOffset position) : 
+        public JsonParseException(Exception inner, string context, LineOffset position) : 
             base(string.Format("JSON parse error at {0}{1} - {2}", position, string.IsNullOrEmpty(context) ? "" : string.Format(", context {0}", context), inner.Message), inner)
         {
             Position = position;
             Context = context;
         }
-        public JsonLineOffset Position;
+        public LineOffset Position;
         public string Context;
     }
 }

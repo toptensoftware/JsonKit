@@ -191,7 +191,7 @@ namespace PetaJson
             }
             catch (Exception x)
             {
-				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
+				var loc = reader == null ? new LineOffset() : reader.CurrentTokenPosition;
 				Console.WriteLine("Exception thrown while parsing JSON at {0}, context:{1}\n{2}", loc, reader?.Context, x.ToString()); 
 				throw new JsonParseException(x, reader?.Context, loc);
             }
@@ -220,7 +220,7 @@ namespace PetaJson
             }
             catch (Exception x)
             {
-				var loc = reader == null ? new JsonLineOffset() : reader.CurrentTokenPosition;
+				var loc = reader == null ? new LineOffset() : reader.CurrentTokenPosition;
 				Console.WriteLine("Exception thrown while parsing JSON at {0}, context:{1}\n{2}", loc, reader.Context, x.ToString()); 
 				throw new JsonParseException(x,reader.Context,loc);
             }
