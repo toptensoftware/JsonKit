@@ -27,13 +27,13 @@ Here goes, a 5 minute whirl-wind tour of using JsonKit...
 Add a package reference to your project:
 
 ~~~xml
-    <PackageReference Include="Topten.JsonKit" Version="1.1.*" />
+<PackageReference Include="Topten.JsonKit" Version="1.1.*" />
 ~~~
 
 and you'll need the JsonKit namespace:
 
 ~~~csharp
-using Topten.JsonKit
+using Topten.JsonKit;
 ~~~
 
 ## Generating JSON
@@ -48,7 +48,7 @@ var json = Json.Format(o);
 or, write to a file
 
 ~~~csharp
-	Json.WriteFile("MyData.json", o);
+Json.WriteFile("MyData.json", o);
 ~~~
 
 using objects
@@ -56,8 +56,8 @@ using objects
 ~~~csharp
 class Person
 {
-	string Name;
-	string Address;
+    string Name;
+    string Address;
 };
 
 var p = new Person() { Name = "Joe Sixpack", Address = "Home" };
@@ -68,8 +68,8 @@ would yield:
 
 ~~~json
 {
-	"name": "Joe Sixpack",
-	"address": "Home"
+    "name": "Joe Sixpack",
+    "address": "Home"
 }
 ~~~
 
@@ -139,10 +139,10 @@ The [Json] attribute when applied to a class or struct marks all public properti
 [Json]
 class Person
 {
-	public string Name;				// Serialized as "name"
-	public string Address;			// Serialized as "address"
-	public string AlsoSerialized;	// Serialized as "alsoSerialized"
-	private string NotSerialized;
+    public string Name;				// Serialized as "name"
+    public string Address;			// Serialized as "address"
+    public string AlsoSerialized;	// Serialized as "alsoSerialized"
+    private string NotSerialized;
 }
 ~~~
 
@@ -152,8 +152,8 @@ will be serialized:
 ~~~csharp
 class Person
 {
-	[Json] public string Name;	// Serialized as "name":
-	public string Address;		// Not serialized
+    [Json] public string Name;	// Serialized as "name":
+    public string Address;		// Not serialized
 }
 ~~~
 
@@ -163,7 +163,7 @@ lowercased.  To override the serialized name, include the name as a parameter to
 ~~~csharp
 class Person
 {
-	[Json("PersonName")] public string Name; 	// Serialized as "PersonName"
+    [Json("PersonName")] public string Name; 	// Serialized as "PersonName"
 }
 ~~~
 
@@ -173,14 +173,14 @@ Use the [JsonExclude] attribute to exclude public fields or properties from seri
 [Json]
 class Person
 {
-	public string Name;		// Serialized as "name"
-	public string Address;	// Serialized as "address"
+    public string Name;		// Serialized as "name"
+    public string Address;	// Serialized as "address"
 
-	[JsonExclude]			// Not serialized
-	public int Age
-	{
-		get { return calculateAge(); }
-	}
+    [JsonExclude]			// Not serialized
+    public int Age
+    {
+        get { return calculateAge(); }
+    }
 }
 ~~~
 
@@ -191,15 +191,15 @@ eg:
 ~~~csharp
 class MyApp
 {
-	public MyApp()
-	{
-		// Settings object has an owner reference that needs to be maintained
-		// across serialization
-		CurrentSettings = new Settings(this);
-	}
+    public MyApp()
+    {
+        // Settings object has an owner reference that needs to be maintained
+        // across serialization
+        CurrentSettings = new Settings(this);
+    }
 
-	[Json(KeepInstance=true)]
-	Settings CurrentSettings;
+    [Json(KeepInstance=true)]
+    Settings CurrentSettings;
 }
 ~~~
 
@@ -217,11 +217,11 @@ DataMember on all members that require serialization.
 [DataContract]
 class Person
 {
-	[DataMember] public string Name;		// Serialized as "Name"
-	[DataMember] public string Address;		// Serialized as "Address"
-	[DataMember(Name="Cool")]
-	public string Hot;						// Serialized as "Cool"
-	public int Age {...}					// Not serialized
+    [DataMember] public string Name;		// Serialized as "Name"
+    [DataMember] public string Address;		// Serialized as "Address"
+    [DataMember(Name="Cool")]
+    public string Hot;						// Serialized as "Cool"
+    public int Age {...}					// Not serialized
 }
 ~~~
 
@@ -235,8 +235,8 @@ Custom formatting can be used on any type.  Say we have the following type:
 ~~~csharp
 struct Point
 {
-	public int X;
-	public int Y;
+    public int X;
+    public int Y;
 }
 ~~~
 
@@ -244,8 +244,8 @@ and we want to serialize points as a comma separated string like this:
 
 ~~~json
 {
-	"TopLeft": "10,20",
-	"BottomRight: "30,40",
+    "TopLeft": "10,20",
+    "BottomRight: "30,40",
 }
 ~~~
 
@@ -255,7 +255,7 @@ To do this, we can to register a formatter:
 // Register custom formatter
 Json.RegisterFormatter<Point>( (writer,point) => 
 {
-	writer.WriteStringLiteral(string.Format("{0},{1}", point.X, point.Y));
+    writer.WriteStringLiteral(string.Format("{0},{1}", point.X, point.Y));
 });
 ~~~
 
@@ -264,15 +264,15 @@ And a custom parser:
 ~~~csharp
 Json.RegisterParser<Point>( literal => {
 
-	var parts = ((string)literal).Split(',');
-	if (parts.Length!=2)
-		throw new InvalidDataException("Badly formatted point");
+    var parts = ((string)literal).Split(',');
+    if (parts.Length!=2)
+        throw new InvalidDataException("Badly formatted point");
 
-	return new Point()
-	{
-		X = int.Parse(parts[0], CultureInfo.InvariantCulture),
-		Y = int.Parse(parts[0], CultureInfo.InvariantCulture),
-	};
+    return new Point()
+    {
+        X = int.Parse(parts[0], CultureInfo.InvariantCulture),
+        Y = int.Parse(parts[0], CultureInfo.InvariantCulture),
+    };
 
 });
 ~~~
@@ -314,26 +314,26 @@ For example, this is the equivalent of the above example:
 ~~~csharp
 struct Point
 {
-	public int X;
-	public int Y;
+    public int X;
+    public int Y;
 
-	string FormatJson() 
-	{ 
-		return string.Format("{0},{1}", X, Y);
-	};
+    string FormatJson() 
+    { 
+        return string.Format("{0},{1}", X, Y);
+    };
 
-	static Point ParseJson(string literal)
-	{
-		var parts = literal.Split(',');
-		if (parts.Length!=2)
-			throw new InvalidDataException("Badly formatted point");
+    static Point ParseJson(string literal)
+    {
+        var parts = literal.Split(',');
+        if (parts.Length!=2)
+            throw new InvalidDataException("Badly formatted point");
 
-		return new Point()
-		{
-			X = int.Parse(parts[0], CultureInfo.InvariantCulture),
-			Y = int.Parse(parts[0], CultureInfo.InvariantCulture),
-		};
-	}
+        return new Point()
+        {
+            X = int.Parse(parts[0], CultureInfo.InvariantCulture),
+            Y = int.Parse(parts[0], CultureInfo.InvariantCulture),
+        };
+    }
 }
 ~~~
 
@@ -346,17 +346,17 @@ Suppose we have a class heirarchy something like this:
 ~~~csharp
 abstract class Shape
 {
-	// Omitted
+    // Omitted
 }
 
 class Rectangle : Shape
 {
-	// Omitted
+    // Omitted
 }
 
 class Ellipse : Shape
 {
-	// Omitted
+    // Omitted
 }
 ~~~
 
@@ -364,9 +364,9 @@ and we'd like to serialize a list of Shapes to JSON like this:
 
 ~~~csharp
 [
-	{ "kind": "Rectangle", /* other rectangle properties omitted */ },
-	{ "kind": "Shape", /* other ellipse properties omitted */ },
-	// etc...
+    { "kind": "Rectangle", /* other rectangle properties omitted */ },
+    { "kind": "Shape", /* other ellipse properties omitted */ },
+    // etc...
 ]
 ~~~
 
@@ -379,12 +379,12 @@ before the other properties of the object are written:
 ~~~csharp
 abstract class Shape : IJsonWriting
 {
-	// Override OnJsonWriting to write out the derived class type
-	void IJsonWriting.OnJsonWriting(IJsonWriter w)
-	{
-		w.WriteKey("kind");
-		w.WriteStringLiteral(GetType().Name);
-	}
+    // Override OnJsonWriting to write out the derived class type
+    void IJsonWriting.OnJsonWriting(IJsonWriter w)
+    {
+        w.WriteKey("kind");
+        w.WriteStringLiteral(GetType().Name);
+    }
 }
 ~~~
 
@@ -394,24 +394,24 @@ For parsing, we need to register a callback function that creates the correct in
 // Register a type factory that can instantiate Shape objects
 Json.RegisterTypeFactory(typeof(Shape), (reader, key) =>
 {
-	// This method will be called back for each key in the json dictionary
-	// until an object instance is returned
+    // This method will be called back for each key in the json dictionary
+    // until an object instance is returned
 
-	// We wrote the object type using the key "kind", look for it
-	if (key != "kind")
-		return null;
+    // We wrote the object type using the key "kind", look for it
+    if (key != "kind")
+        return null;
 
-	// Read the next literal and instantiate the correct object type
-	return reader.ReadLiteral(literal =>
-	{
-		switch ((string)literal)
-		{
-			case "Rectangle": return new Rectangle();
-			case "Ellipse": return new Ellipse();
-			default:
-				throw new InvalidDataException(string.Format("Unknown shape kind: '{0}'", literal));
-		}
-	});
+    // Read the next literal and instantiate the correct object type
+    return reader.ReadLiteral(literal =>
+    {
+        switch ((string)literal)
+        {
+            case "Rectangle": return new Rectangle();
+            case "Ellipse": return new Ellipse();
+            default:
+                throw new InvalidDataException(string.Format("Unknown shape kind: '{0}'", literal));
+        }
+    });
 });
 ~~~
 
@@ -434,32 +434,32 @@ by implementing one or more of the following interfaces:
 // Called before loading via reflection
 public interface IJsonLoading
 {
-	void OnJsonLoading(IJsonReader r);
+    void OnJsonLoading(IJsonReader r);
 }
 
 // Called after loading via reflection
 public interface IJsonLoaded
 {
-	void OnJsonLoaded(IJsonReader r);
+    void OnJsonLoaded(IJsonReader r);
 }
 
 // Called for each field while loading from reflection
 // Return true if handled
 public interface IJsonLoadField
 {
-	bool OnJsonField(IJsonReader r, string key);
+    bool OnJsonField(IJsonReader r, string key);
 }
 
 // Called when about to write using reflection
 public interface IJsonWriting
 {
-	void OnJsonWriting(IJsonWriter w);
+    void OnJsonWriting(IJsonWriter w);
 }
 
 // Called after written using reflection
 public interface IJsonWritten
 {
-	void OnJsonWritten(IJsonWriter w);
+    void OnJsonWritten(IJsonWriter w);
 }
 ~~~
 
@@ -468,14 +468,14 @@ For example, it's often necessary to wire up ownership references on loaded sub-
 ~~~csharp
 class Drawing : IJsonLoaded
 {
-	[Json]
-	public List<Shape> Shapes;
+    [Json]
+    public List<Shape> Shapes;
 
-	void IJsonLoaded.OnJsonLoaded()
-	{
-		// Shapes have been loaded, set owner references
-		Shapes.ForEach(x => x.Owner = this);
-	}
+    void IJsonLoaded.OnJsonLoaded()
+    {
+        // Shapes have been loaded, set owner references
+        Shapes.ForEach(x => x.Owner = this);
+    }
 }
 ~~~
 
@@ -486,28 +486,28 @@ imagine a situation where a numeric ID field was incorrectly provided by a serve
 ~~~csharp
 class MyRecord : IJsonLoadField
 {
-	[Json] long id;				// Note: numeric (not string) field
-	[Json] string description;
+    [Json] long id;				// Note: numeric (not string) field
+    [Json] string description;
 
-	// Override OnJsonField to intercept the bad server data
-	bool IJsonLoadField.OnJsonField(IJsonReader r, string key)
-	{
-		// id provided as string? Eg: "id": "1234"
-		if (key=="id" && r.GetLiteralKind()==LiteralKind.String)
-		{
-			// Parse the string
-			id = long.Parse(r.GetLiteralString());
+    // Override OnJsonField to intercept the bad server data
+    bool IJsonLoadField.OnJsonField(IJsonReader r, string key)
+    {
+        // id provided as string? Eg: "id": "1234"
+        if (key=="id" && r.GetLiteralKind()==LiteralKind.String)
+        {
+            // Parse the string
+            id = long.Parse(r.GetLiteralString());
 
-			// Skip the string literal now that we've handled it
-			r.NextToken();		
+            // Skip the string literal now that we've handled it
+            r.NextToken();		
 
-			// Return true to suppress default processing 
-			return true;
-		}
+            // Return true to suppress default processing 
+            return true;
+        }
 
-		// Other keys and non-quoted id field values processed as normal
-		return false;			
-	}
+        // Other keys and non-quoted id field values processed as normal
+        return false;			
+    }
 }
 ~~~
 
@@ -555,20 +555,20 @@ Suppose we have the following JSON:
 
 ~~~json
 {
-	"settings":
-	{
-		"userSettings":
-		{
-			"username":"jsonbourne23",
-			"password":"123",
-			"email":"json@bourne.com",
-		},
-		"appSettings":
-		{
-			"firstRun":false,
-			"serverUrl":"http://www.toptensoftware.com",
-		}
-	}
+    "settings":
+    {
+        "userSettings":
+        {
+            "username":"jsonbourne23",
+            "password":"123",
+            "email":"json@bourne.com",
+        },
+        "appSettings":
+        {
+            "firstRun":false,
+            "serverUrl":"http://www.toptensoftware.com",
+        }
+    }
 }
 ~~~
 
@@ -608,7 +608,7 @@ You can check if a path exists like this:
 ~~~csharp
 if (data.PathExists("settings.appSettings"))
 {
-	// yep
+    // yep
 }
 ~~~
 
@@ -669,12 +669,12 @@ eg: the non-strict parser will allow this:
 
 ~~~
 {
-	/* This is a C-style comment */
-	"quotedKey": "allowed",
-	nonQuotedKey: "also allowed",
-	"arrayWithTrailingComma": [1,2,3,],	
-	"hexAllowed": 0x1234,
-	"trailing commas": "allowed ->",	// <- see the comma, not normally allowed
+    /* This is a C-style comment */
+    "quotedKey": "allowed",
+    nonQuotedKey: "also allowed",
+    "arrayWithTrailingComma": [1,2,3,],	
+    "hexAllowed": 0x1234,
+    "trailing commas": "allowed ->",	// <- see the comma, not normally allowed
 }
 ~~~
 
@@ -691,14 +691,14 @@ The IJsonReader interface reads from the JSON input stream.
 ~~~csharp
 public interface IJsonReader
 {
-	object ReadLiteral(Func<object, object> converter);
-	void ReadDictionary(Action<string> callback);
-	void ReadArray(Action callback);
-	object Parse(Type type);
-	T Parse<T>();
-	LiteralKind GetLiteralKind();
-	string GetLiteralString();
-	void NextToken();
+    object ReadLiteral(Func<object, object> converter);
+    void ReadDictionary(Action<string> callback);
+    void ReadArray(Action callback);
+    object Parse(Type type);
+    T Parse<T>();
+    LiteralKind GetLiteralKind();
+    string GetLiteralString();
+    void NextToken();
 }
 ~~~
 
@@ -730,13 +730,13 @@ The IJsonWriter interface writes to the JSON output stream:
 ~~~csharp
 public interface IJsonWriter
 {
-	void WriteStringLiteral(string str);
-	void WriteRaw(string str);
-	void WriteArray(Action callback);
-	void WriteDictionary(Action callback);
-	void WriteValue(object value);
-	void WriteElement();
-	void WriteKey(string key);
+    void WriteStringLiteral(string str);
+    void WriteRaw(string str);
+    void WriteArray(Action callback);
+    void WriteDictionary(Action callback);
+    void WriteValue(object value);
+    void WriteElement();
+    void WriteKey(string key);
 }
 ~~~
 
@@ -762,10 +762,10 @@ eg: to write a dictionary:
 ~~~csharp
 writer.WriteDictionary(() =>
 {
-	writer.WriteKey("apples");
-	writer.WriteValue("red");
-	writer.WriteKey("bananas");
-	writer.WriteValue("yellow");
+    writer.WriteKey("apples");
+    writer.WriteValue("red");
+    writer.WriteKey("bananas");
+    writer.WriteValue("yellow");
 });
 ~~~
 
@@ -774,11 +774,11 @@ eg: to write an array:
 ~~~csharp
 writer.WriteArray(()=>
 {
-	for (int i=0; i<10; i++)
-	{
-		writer.WriteElement();
-		writer.WriteValue(i);
-	}
+    for (int i=0; i<10; i++)
+    {
+        writer.WriteElement();
+        writer.WriteValue(i);
+    }
 });
 ~~~
 
@@ -788,13 +788,13 @@ Wondering about performance?  JsonKit is right up there with the best of them.
 Some simple benchmarks serializing a long list of objects with a mix of 
 different primitive types yielded this: (smaller tick value = quicker, better)
 
-	JsonKit      format: 491865 ticks
-	Json.NET     format: 757618 ticks x1.54
-	ServiceStack format: 615091 ticks x1.25
+    JsonKit      format: 491865 ticks
+    Json.NET     format: 757618 ticks x1.54
+    ServiceStack format: 615091 ticks x1.25
 
-	JsonKit       parse: 1011818 ticks
-	Json.NET      parse: 1204574 ticks x1.19
-	ServiceStack  parse: 1177895 ticks x1.16
+    JsonKit       parse: 1011818 ticks
+    Json.NET      parse: 1204574 ticks x1.19
+    ServiceStack  parse: 1177895 ticks x1.16
 
 Although this test shows JsonKit to be quicker, different data types may yield different results.  In 
 otherwords: I tested enough to make sure it wasn't ridiculously slow, but haven't done extensive benchmarks.
