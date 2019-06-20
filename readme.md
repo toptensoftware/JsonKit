@@ -82,7 +82,7 @@ From a string:
 int o = Json.Parse<int>("23");
 ~~~
 
-From string to a dynamic:
+From string to a `dynamic`:
 
 ~~~csharp
 dynamic o = Json.Parse<object>("{\"apples\":\"red\", \"bananas\":\"yellow\" }");
@@ -131,9 +131,9 @@ Json.ParseFileInto<Person>("aboutme.json", person);
 
 ## Attributes
 
-JsonKit provides two attributes for decorating objects for serialization - [Json] and [JsonExclude].
+JsonKit provides several attributes for decorating objects for serialization.
 
-The [Json] attribute when applied to a class or struct marks all public properties and fields for serialization:
+The `[Json]` attribute when applied to a class or struct marks all public properties and fields for serialization:
 
 ~~~csharp
 [Json]
@@ -158,7 +158,7 @@ class Person
 ~~~
 
 By default members are serialized using the name of the field or property with the first letter
-lowercased.  To override the serialized name, include the name as a parameter to the [Json] attribute:
+lowercased.  To override the serialized name, include the name as a parameter to the `[Json]` attribute:
 
 ~~~csharp
 class Person
@@ -167,7 +167,7 @@ class Person
 }
 ~~~
 
-Use the [JsonExclude] attribute to exclude public fields or properties from serialization
+Use the `[JsonExclude]` attribute to exclude public fields or properties from serialization
 
 ~~~csharp
 [Json]
@@ -203,15 +203,31 @@ class MyApp
 }
 ~~~
 
-In this example the existing CurrentSettings object will be serialized into. If KeepInstance
-was set to false, JsonKit would instantiate a new Settings object, load it and then assign
-it to the CurrentSettings property.
+In this example the existing `CurrentSettings` object will be serialized into. If `KeepInstance`
+was set to false, JsonKit would instantiate a new `Settings` object, load it and then assign
+it to the `CurrentSettings` property.
+
+The `[JsonUnknown]` attribute can be applied to enum values to specify which enum 
+value to select if the supplied json value doesn't match any.
+
+eg: any unknown values in the json will be mapped to `Fruit.unknown`
+
+~~~csharp
+[JsonUnknown(Fruit.unknown)]
+enum Fruit
+{
+    unknown,
+    Apple,
+    Pear,
+}
+~~~
+
 
 ## DataContract and DataMember attributes
 
-You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
-are no JsonKit attributes on the class or it's members. You must specify DataContract on the type and
-DataMember on all members that require serialization.  
+You can also use the system supplied `DataContract` and `DataMember` attributes.  They'll only be used if there
+are no JsonKit attributes on the class or its members. You must specify `DataContract` on the type and
+`DataMember` on all members that require serialization.  
 
 ~~~csharp
 [DataContract]
@@ -225,8 +241,8 @@ class Person
 }
 ~~~
 
-Note that the first letter of the member is left as upper case (unlike when using the Json attributes) and
-there's no need for an exclude attribute as only members marked DataMember are included in the first place.
+Note that the first letter of the member is left as upper case (unlike when using the `[Json]` attributes) and
+there's no need for an exclude attribute as only members marked `DataMember` are included in the first place.
 
 ## Custom Formatting
 
@@ -245,7 +261,7 @@ and we want to serialize points as a comma separated string like this:
 ~~~json
 {
     "TopLeft": "10,20",
-    "BottomRight: "30,40",
+    "BottomRight": "30,40",
 }
 ~~~
 
@@ -288,7 +304,7 @@ var point = Json.Parse<Point>("\"10,20\"");
 ~~~
 
 Note that in this example we're formatting to a single string literal.  We can do more
-complex custom serialization using the IJsonReader and IJsonWriter interfaces - see below.
+complex custom serialization using the `IJsonReader` and `IJsonWriter` interfaces - see below.
 
 ## Simple Formatting for Value Types
 
@@ -373,7 +389,7 @@ and we'd like to serialize a list of Shapes to JSON like this:
 In other words a value in the JSON dictionary determines the type of object that 
 needs to be instantiated for that element.
 
-We can write out the shape kind by implementing the IJsonWriting interface which gets called
+We can write out the shape kind by implementing the `IJsonWriting` interface which gets called
 before the other properties of the object are written:
 
 ~~~csharp
@@ -415,9 +431,9 @@ Json.RegisterTypeFactory(typeof(Shape), (reader, key) =>
 });
 ~~~
 
-When attempting to deserialize Shape objects, the registered callback will be called with each 
+When attempting to deserialize `Shape` objects, the registered callback will be called with each 
 key in the dictionary until it returns an object instance.  In this case we're looking for a key
-named "kind" and we use it's value to create either a Rectangle or Ellipse.
+named "kind" and we use its value to create either a `Rectangle` or `Ellipse`.
 
 Note that the field used to hold the type (ie: "kind") does not need to be the first field in the
 in the dictionary being parsed. After instantiating the object, the input stream is re-wound to the
@@ -479,8 +495,8 @@ class Drawing : IJsonLoaded
 }
 ~~~
 
-The IJsonLoadField interface can be used to "fix up" incorrect incoming JSON data.  For example, 
-imagine a situation where a numeric ID field was incorrectly provided by a server as a string 
+The `IJsonLoadField` interface can be used to "fix up" incorrect incoming JSON data.  For example, 
+imagine a situation where a numeric `id` field was incorrectly provided by a server as a string 
 (enclosed in quotes) instead of a plain number.
 
 ~~~csharp
@@ -590,14 +606,14 @@ Or set it like this:
 data.SetPath("settings.appSettings.firstRun", false);
 ~~~
 
-SetPath creates the path using a set of Dictionary<string,object> if necessary:
+SetPath creates the path using a set of `Dictionary<string,object>` if necessary:
 
 ~~~csharp
 var data = new Dictionary<String, object>();
 data.SetPath("settings.appSettings.serverUrl", "http://whatever.com");
 ~~~
 
-GetPath can reparse if necessary to satify the requested type:
+`GetPath` can reparse if necessary to satify the requested type:
 
 ~~~csharp
 var userSettings = data.GetPath<UserSettings>("settings.userSettings", null);
@@ -638,7 +654,7 @@ var json = Json.Format(data);
 System.Diagnostic.Assert(json.IndexOf("newemail")>=0);
 ~~~
 
-Note: GetObjectAtPath only works with reference types, not structs.
+Note: `GetObjectAtPath` only works with reference types, not structs.
 
 ## Options
 
@@ -686,7 +702,7 @@ parsers and formatters.
 
 ### IJsonReader
 
-The IJsonReader interface reads from the JSON input stream.  
+The `IJsonReader` interface reads from the JSON input stream.  
 
 ~~~csharp
 public interface IJsonReader
@@ -702,7 +718,7 @@ public interface IJsonReader
 }
 ~~~
 
-*ReadLiteral* - reads a single literal value from the input stream.  Throws an exception if
+*`ReadLiteral`* - reads a single literal value from the input stream.  Throws an exception if
 the next token isn't a literal value.  You should provide a callback that converts the raw
 literal to the required value, which will then be returned as the return value from ReadLiteral.
 
@@ -710,22 +726,22 @@ Wherever possible, conversion should be done in the callback to ensure that erro
 report the error location just before the bad literal, instead of after it.
 
 
-*ReadDictionary* - reads a JSON dictionary, calling the callback for each key encountered.  The
+*`ReadDictionary`* - reads a JSON dictionary, calling the callback for each key encountered.  The
 callback routine should read the key's value using the IJsonReader interface.  If nothing is read
 by the callback, JsonKit will skip the value and move onto the next key.
 
-*ReadArray* - reads a JSON array, calling the callback at each element position. The callback 
+*`ReadArray`* - reads a JSON array, calling the callback at each element position. The callback 
 routine must read each value from the IJsonReader before returning.
 
-*Parse* - parses a typed value from the input stream.
+*`Parse`* - parses a typed value from the input stream.
 
-*GetLiteralKind*, *GetLiteralString* and *NextToken* provide ability to read literals without boxing
+*`GetLiteralKind`*, *`GetLiteralString`* and *`NextToken`* provide ability to read literals without boxing
 the value into an Object.  Used by the "Reflection.Emit" type parsers, these are much faster than 
-ReadLiteral, but less convenient to use.
+`ReadLiteral`, but less convenient to use.
 
 ### IJsonWriter
 
-The IJsonWriter interface writes to the JSON output stream:
+The `IJsonWriter` interface writes to the JSON output stream:
 
 ~~~csharp
 public interface IJsonWriter
@@ -740,22 +756,22 @@ public interface IJsonWriter
 }
 ~~~
 
-*WriteStringLiteral* - writes a string literal to the output stream, including the surrounding quotes and
+*`WriteStringLiteral`* - writes a string literal to the output stream, including the surrounding quotes and
  escaping the content as required.
 
-*WriteRaw* - writes directly to the output stream.  Use for comments, or self generated JSON data.
+*`WriteRaw`* - writes directly to the output stream.  Use for comments, or self generated JSON data.
 
-*WriteArray* - writes an array to the output stream.  The callback should write each element.
+*`WriteArray`* - writes an array to the output stream.  The callback should write each element.
 
-*WriteDictionary* - writes a dictionary to the output stream.  The callback should write each element.
+*`WriteDictionary`* - writes a dictionary to the output stream.  The callback should write each element.
 
-*WriteValue* - formats and writes any object value.
+*`WriteValue`* - formats and writes any object value.
 
-*WriteElement* - call from the callback of WriteArray to indicate that the next element is about to be 
+*`WriteElement`* - call from the callback of `WriteArray` to indicate that the next element is about to be 
 written.  Causes JsonKit to write separating commas and whitespace.
 
-*WriteKey* - call from the callback of WriteDictionary to write the key part of the next element.  Writes
-whitespace, separating commas, the key and it's quotes, the colon.
+*`WriteKey`* - call from the callback of WriteDictionary to write the key part of the next element.  Writes
+whitespace, separating commas, the key and its quotes, the colon.
 
 eg: to write a dictionary:
 
