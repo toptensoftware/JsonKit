@@ -6,7 +6,7 @@ using System.Reflection;
 [assembly: AssemblyVersion("1.1.114")]
 [assembly: AssemblyFileVersion("1.1.114")]
 [assembly: AssemblyCompany("Topten Software")]
-[assembly: AssemblyProduct("PetaJson")]
+[assembly: AssemblyProduct("JsonKit")]
 
 static class BuildInfo
 {

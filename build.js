@@ -18,7 +18,7 @@ if (bt.options.official)
     bt.clock_version();
 
     // Run Tests
-    bt.dntest("Release", "PetaJson.Test");
+    bt.dntest("Release", "JsonKit.Test");
 
     // Force clean
     bt.options.clean = true;
@@ -26,17 +26,17 @@ if (bt.options.official)
 }
 
 // Build
-bt.dnbuild("Release", "PetaJson");
+bt.dnbuild("Release", "JsonKit");
 
 // Build NuGet Package?
 if (bt.options.official || bt.options.nuget)
 {
 	bt.signfile([
-        "Build\\Release\\PetaJson\\netcoreapp2.0\\PetaJson.dll",
-        "Build\\Release\\PetaJson\\net46\\PetaJson.dll",
-    ], "PetaJson JSON Serialization Library");
+        "Build\\Release\\JsonKit\\netcoreapp2.0\\JsonKit.dll",
+        "Build\\Release\\JsonKit\\net46\\JsonKit.dll",
+    ], "JsonKit JSON Serialization Library");
 
-    bt.nupack("PetaJson.nuspec", "./Build");
+    bt.nupack("JsonKit.nuspec", "./Build");
 }
 
 if (bt.options.official)

@@ -1,6 +1,6 @@
-# PetaJson
+# JsonKit
 
-PetaJson is a simple but flexible JSON library implemented in a single C# file.  Features include:
+JsonKit is a simple but flexible JSON library implemented in a single C# file.  Features include:
 
 * Standard JSON parsing and generation
 * Supports strongly typed serialization through reflection or custom code
@@ -16,23 +16,23 @@ PetaJson is a simple but flexible JSON library implemented in a single C# file. 
 * Simple set of custom attributes to control serialization
 * Optional non-strict parsing allows comments, non-quoted dictionary keys, trailing commas and hex literals (great for config files)
 * Optional pretty formatting
-* No dependencies, one file - PetaJson.cs
+* No dependencies, one file - JsonKit.cs
 * Works on .NET, Mono, Xamarin.Android, Xamarin.iOS.
 
 # Usage
 
-Here goes, a 5 minute whirl-wind tour of using PetaJson...
+Here goes, a 5 minute whirl-wind tour of using JsonKit...
 
 ## Setup
 
-1. Add PetaJson.cs to your project
+1. Add JsonKit.cs to your project
 2. That's it
 
-Well almost, you'll probably want some `using PetaJson;` clauses and depending on your target platform you might need to define the following symbols in your project to  disable some functionality:
+Well almost, you'll probably want some `using Topten.JsonKit;` clauses and depending on your target platform you might need to define the following symbols in your project to  disable some functionality:
 
-* `PETAJSON_NO_DYNAMIC` - disable support for System.Dynamic.ExpandoObject
-* `PETAJSON_NO_EMIT` - disable use of System.Reflection.Emit (slower, more portable)
-* `PETAJSON_NO_DATACONTRACT` - disable support for System.Runtime.Serialization.DataContract/Member
+* `JsonKit_NO_DYNAMIC` - disable support for System.Dynamic.ExpandoObject
+* `JsonKit_NO_EMIT` - disable use of System.Reflection.Emit (slower, more portable)
+* `JsonKit_NO_DATACONTRACT` - disable support for System.Runtime.Serialization.DataContract/Member
 
 ## Generating JSON
 
@@ -106,7 +106,7 @@ From file into an existing instance:
 
 ## Attributes
 
-PetaJson provides two attributes for decorating objects for serialization - [Json] and [JsonExclude].
+JsonKit provides two attributes for decorating objects for serialization - [Json] and [JsonExclude].
 
 The [Json] attribute when applied to a class or struct marks all public properties and fields for serialization:
 
@@ -169,13 +169,13 @@ eg:
 	}
 
 In this example the existing CurrentSettings object will be serialized into. If KeepInstance
-was set to false, PetaJson would instantiate a new Settings object, load it and then assign
+was set to false, JsonKit would instantiate a new Settings object, load it and then assign
 it to the CurrentSettings property.
 
 ## DataContract and DataMember attributes
 
 You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
-are no PetaJson attributes on the class or it's members. You must specify DataContract on the type and
+are no JsonKit attributes on the class or it's members. You must specify DataContract on the type and
 DataMember on all members that require serialization.  
 
 	[DataContract]
@@ -364,7 +364,7 @@ Note that the field used to hold the type (ie: "kind") does not need to be the f
  in the dictionary being parsed. After instantiating the object, the input stream is re-wound to the
  start of the dictionary and then re-parsed into the instantiated object.  Note too that
  the underlying stream doesn't need to support seeking - the rewind mechanism is implemented in 
- PetaJson.
+ JsonKit.
 
 ## Serialization Events
 
@@ -453,7 +453,7 @@ the use of interfaces is more discoverable through Intellisense/Autocomplete.
 
 ## Cloning and Re-parsing Objects
 
-PetaJson includes a couple of helper functions for cloning objects by saving to them to JSON and then reloading:
+JsonKit includes a couple of helper functions for cloning objects by saving to them to JSON and then reloading:
 
 	var person1 = new Person() { Name = "Mr Json Bourne"; }
 	var person2 = Json.Clone(person1);
@@ -476,7 +476,7 @@ You can also go the other way:
 
 ## Bonus Dictionary Helpers
 
-PetaJson includes some super handy extensions to `IDictionary<string,object>` that make working
+JsonKit includes some super handy extensions to `IDictionary<string,object>` that make working
 with weakly typed JSON data easier.  Some of these methods are particularly handy when an app
 is using JSON to store configuration options or settings.
 
@@ -553,7 +553,7 @@ Note: GetObjectAtPath only works with reference types, not structs.
 
 ## Options
 
-PetaJson has a couple of formatting/parsing options. These can be set as global defaults:
+JsonKit has a couple of formatting/parsing options. These can be set as global defaults:
 
 	Json.WriteWhitespaceDefault = true;		// Pretty formatting
 	Json.StrictParserDefault = true;		// Enable strict parsing
@@ -615,7 +615,7 @@ report the error location just before the bad literal, instead of after it.
 
 *ReadDictionary* - reads a JSON dictionary, calling the callback for each key encountered.  The
 callback routine should read the key's value using the IJsonReader interface.  If nothing is read
-by the callback, PetaJson will skip the value and move onto the next key.
+by the callback, JsonKit will skip the value and move onto the next key.
 
 *ReadArray* - reads a JSON array, calling the callback at each element position. The callback 
 routine must read each value from the IJsonReader before returning.
@@ -653,7 +653,7 @@ The IJsonWriter interface writes to the JSON output stream:
 *WriteValue* - formats and writes any object value.
 
 *WriteElement* - call from the callback of WriteArray to indicate that the next element is about to be 
-written.  Causes PetaJson to write separating commas and whitespace.
+written.  Causes JsonKit to write separating commas and whitespace.
 
 *WriteKey* - call from the callback of WriteDictionary to write the key part of the next element.  Writes
 whitespace, separating commas, the key and it's quotes, the colon.
@@ -681,19 +681,19 @@ eg: to write an array:
 
 ## Performance
 
-Wondering about performance?  When Reflection.Emit is enabled, PetaJson is right up there with
+Wondering about performance?  When Reflection.Emit is enabled, JsonKit is right up there with
 the best of them.  Some simple benchmarks serializing a long list of objects with a mix of 
 different primitive types yielded this: (smaller tick value = quicker, better)
 
-	PetaJson     format: 491865 ticks
+	JsonKit     format: 491865 ticks
 	Json.NET     format: 757618 ticks x1.54
 	ServiceStack format: 615091 ticks x1.25
 
-	PetaJson      parse: 1011818 ticks
+	JsonKit      parse: 1011818 ticks
 	Json.NET      parse: 1204574 ticks x1.19
 	ServiceStack  parse: 1177895 ticks x1.16
 
-Although this test shows PetaJson to be quicker, different data types may yield different results.  In 
+Although this test shows JsonKit to be quicker, different data types may yield different results.  In 
 otherwords: I tested enough to make sure it wasn't ridiculously slow, but haven't done extensive benchmarks.
 
 ## License
