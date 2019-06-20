@@ -22,15 +22,12 @@ using System.Linq;
 using System.IO;
 using System.Reflection;
 using System.Globalization;
-#if !JsonKit_NO_EMIT
 using System.Reflection.Emit;
-#endif
 
 
 
 namespace Topten.JsonKit
 {
-#if !JsonKit_NO_EMIT
     static class Emit
     {
 
@@ -807,5 +804,4 @@ namespace Topten.JsonKit
             throw new InvalidDataException("expected a numeric literal");
         }
     }
-#endif
 }

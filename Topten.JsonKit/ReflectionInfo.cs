@@ -20,9 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-#if !JsonKit_NO_DATACONTRACT
 using System.Runtime.Serialization;
-#endif
 
 
 
@@ -177,7 +175,6 @@ namespace Topten.JsonKit
                 // Do any members have a [Json] attribute
                 bool anyFieldsMarked = allMembers.Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
 
-#if !JsonKit_NO_DATACONTRACT
                 // Try with DataContract and friends
                 if (!typeMarked && !anyFieldsMarked && type.GetCustomAttributes(typeof(DataContractAttribute), true).OfType<DataContractAttribute>().Any())
                 {
@@ -200,7 +197,7 @@ namespace Topten.JsonKit
                     ri.Members.Sort((a, b) => String.CompareOrdinal(a.JsonKey, b.JsonKey));    // Match DataContractJsonSerializer
                     return ri;
                 }
-#endif
+
                 {
                     // Should we serialize all public methods?
                     bool serializeAllPublics = typeMarked || !anyFieldsMarked;

@@ -17,25 +17,7 @@
 // Define JsonKit_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.IO;
-using System.Reflection;
-using System.Globalization;
-using System.Collections;
-using System.Threading;
-#if !JsonKit_NO_DYNAMIC
-using System.Dynamic;
-#endif
-#if !JsonKit_NO_EMIT
-using System.Reflection.Emit;
-#endif
-#if !JsonKit_NO_DATACONTRACT
-using System.Runtime.Serialization;
-#endif
-
-
 
 namespace Topten.JsonKit
 {
@@ -47,11 +29,9 @@ namespace Topten.JsonKit
             WriteWhitespaceDefault = true;
             StrictParserDefault = false;
 
-#if !JsonKit_NO_EMIT
             Json.SetFormatterResolver(Emit.MakeFormatter);
             Json.SetParserResolver(Emit.MakeParser);
             Json.SetIntoParserResolver(Emit.MakeIntoParser);
-#endif
         }
 
         // Pretty format default

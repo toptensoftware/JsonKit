@@ -22,9 +22,7 @@ using System.Linq;
 using System.IO;
 using System.Globalization;
 using System.Collections;
-#if !JsonKit_NO_DYNAMIC
 using System.Dynamic;
-#endif
 
 
 namespace Topten.JsonKit
@@ -334,11 +332,7 @@ namespace Topten.JsonKit
             // Untyped dictionary?
             if (_tokenizer.CurrentToken == Token.OpenBrace && (type.IsAssignableFrom(typeof(IDictionary<string, object>))))
             {
-#if !JsonKit_NO_DYNAMIC
                 var container = (new ExpandoObject()) as IDictionary<string, object>;
-#else
-                var container = new Dictionary<string, object>();
-#endif
                 ParseDictionary(key =>
                 {
                     container[key] = Parse(typeof(Object));
