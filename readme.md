@@ -18,7 +18,7 @@ JsonKit (formerly PetaJson) is a simple, lightweight but flexible JSON serializa
 * No dependencies
 * Works on .NET Framework and .NET Core 2.0
 
-# Usage
+## Usage
 
 Here goes, a 5 minute whirl-wind tour of using JsonKit...
 
