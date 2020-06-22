@@ -11,33 +11,22 @@ if (bt.options.official)
     // Clock version
     bt.clock_version();
 
-    // Run Tests
-    bt.dntest("Release", "Topten.JsonKit.Test");
-
-    // Force clean
-    bt.options.clean = true;
-    bt.clean("./Build");
+    // Clean build directory
+    bt.cli("rm -rf ./Build");
 }
 
 // Build
-bt.dnbuild("Release", "Topten.JsonKit");
-
-// Build NuGet Package?
-if (bt.options.official || bt.options.nuget)
-{
-	bt.signfile([
-        "Build\\Release\\Topten.JsonKit\\netcoreapp2.0\\Topten.JsonKit.dll",
-        "Build\\Release\\Topten.JsonKit\\net46\\Topten.JsonKit.dll",
-    ], "JsonKit JSON Serialization Library");
-
-    bt.nupack("Topten.JsonKit.nuspec", "./Build");
-}
+bt.cli("dotnet build Topten.JsonKit -c Release")
 
 if (bt.options.official)
 {
+    bt.cli("dotnet test Topten.JsonKit.Test -c Release");
+
     // Tag and commit
     bt.git_tag();
 
     // Push nuget package
-    bt.nupush(`./build/*.${bt.options.version.build}.nupkg`, "http://nuget.toptensoftware.com/v3/index.json");
+    bt.cli(`dotnet nuget push`,
+           `./Build/Release/Topten.JsonKit/*.${bt.options.version.build}.nupkg`,
+           `--source "Topten GitHub"`);
 }
