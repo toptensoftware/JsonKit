@@ -7,7 +7,29 @@
     <IntermediateOutputPath>..\Build\$(Configuration)\$(MSBuildProjectName)\obj</IntermediateOutputPath>
     <GenerateFullPaths>True</GenerateFullPaths>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Company>Topten Software</Company>
+    <Authors>Topten Software</Authors>
+    <Copyright>Copyright © 2014-2020 Topten Software.  All Rights Reserved</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageIcon>nuget-icon.png</PackageIcon>
+    <PackageProjectUrl>https://github.com/toptensoftware/jsonkit</PackageProjectUrl>
+    <PackageTags>JSON, Serialization</PackageTags>
+    <Description>Lightweight JSON Serialization Library</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="..\version.cs" Link="version.cs" />
   </ItemGroup>
+
+  <Target Name="Code Sign" AfterTargets="Build" Condition="'$(Configuration)'=='Release' And '$(TargetFileName)'!=''">
+      <Exec Command="ttssign $(TargetDir)$(TargetFileName)" />
+  </Target>
+
+  <ItemGroup>
+      <None Include="../Artwork/nuget-icon.png" Pack="true" PackagePath=""/>
+  </ItemGroup>
+
 </Project>
