@@ -1,10 +1,4 @@
-var bt = require('./BuildTools/buildTools.js')
-
-bt.options.companyName = "Topten Software";
-bt.options.codeSignCertificate = "C:\\Users\\brad\\dropbox\\topten\\ToptenCodeSigningCertificate.pfx";
-bt.options.codeSignPasswordFile = "C:\\Users\\brad\\dropbox\\topten\\codesign_password.txt";
-bt.symStorePath = "\\\\cool\\public\\ToptenSymbols";
-
+var bt = require('./buildtools/buildTools.js')
 
 // Load version info
 bt.version();
