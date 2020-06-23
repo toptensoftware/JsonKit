@@ -24,7 +24,7 @@ using System.Globalization;
 
 namespace Topten.JsonKit
 {
-    public class Tokenizer
+    class Tokenizer
     {
         public Tokenizer(TextReader r, JsonOptions options)
         {

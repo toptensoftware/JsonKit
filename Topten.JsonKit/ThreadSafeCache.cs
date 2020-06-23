@@ -23,7 +23,7 @@ using System.Threading;
 
 namespace Topten.JsonKit
 {
-    public class ThreadSafeCache<TKey, TValue>
+    class ThreadSafeCache<TKey, TValue>
     {
         public ThreadSafeCache()
         {

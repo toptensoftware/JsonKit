@@ -24,16 +24,37 @@ namespace Topten.JsonKit
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public enum Token
     {
+        /// <summary>End of file</summary>
         EOF,
+
+        /// <summary>An identifier</summary>
         Identifier,
+
+        /// <summary>A literal value</summary>
         Literal,
+
+        /// <summary>An open brace '{'</summary>
         OpenBrace,
+
+        /// <summary>A closing brace '}'</summary>
         CloseBrace,
+
+        /// <summary>An open square bracket '['</summary>
         OpenSquare,
+
+        /// <summary>A closing square bracket ']'</summary>
         CloseSquare,
+
+        /// <summary>An equal sign '='</summary>
         Equal,
+
+        /// <summary>A colon ':'</summary>
         Colon,
+
+        /// <summary>A semi-colon ';'</summary>
         SemiColon,
+
+        /// <summary>A comma ','</summary>
         Comma,
     }
 }

@@ -586,10 +586,10 @@ namespace Topten.JsonKit
         }
 
         // Yikes!
-        public static Func<Type, Action<IJsonReader, object>> _intoParserResolver;
-        public static Func<Type, Func<IJsonReader, Type, object>> _parserResolver;
-        public static ThreadSafeCache<Type, Func<IJsonReader, Type, object>> _parsers = new ThreadSafeCache<Type, Func<IJsonReader, Type, object>>();
-        public static ThreadSafeCache<Type, Action<IJsonReader, object>> _intoParsers = new ThreadSafeCache<Type, Action<IJsonReader, object>>();
-        public static ThreadSafeCache<Type, Func<IJsonReader, string, object>> _typeFactories = new ThreadSafeCache<Type, Func<IJsonReader, string, object>>();
+        internal static Func<Type, Action<IJsonReader, object>> _intoParserResolver;
+        internal static Func<Type, Func<IJsonReader, Type, object>> _parserResolver;
+        internal static ThreadSafeCache<Type, Func<IJsonReader, Type, object>> _parsers = new ThreadSafeCache<Type, Func<IJsonReader, Type, object>>();
+        internal static ThreadSafeCache<Type, Action<IJsonReader, object>> _intoParsers = new ThreadSafeCache<Type, Action<IJsonReader, object>>();
+        internal static ThreadSafeCache<Type, Func<IJsonReader, string, object>> _typeFactories = new ThreadSafeCache<Type, Func<IJsonReader, string, object>>();
     }
 }

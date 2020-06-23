@@ -1,20 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <Import Project="../version.props" />
+  <Import Project="../buildtools/Topten.props" />
 
   <PropertyGroup>
     <TargetFrameworks>net46;netcoreapp2.0</TargetFrameworks>
-    <Configurations>Debug;Release</Configurations>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <OutputPath>..\Build\$(Configuration)\$(MSBuildProjectName)</OutputPath>
-    <IntermediateOutputPath>..\Build\$(Configuration)\$(MSBuildProjectName)\obj</IntermediateOutputPath>
-    <GenerateFullPaths>True</GenerateFullPaths>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <TtsCodeSign>True</TtsCodeSign>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Company>Topten Software</Company>
-    <Authors>Topten Software</Authors>
     <Copyright>Copyright © 2014-2020 Topten Software.  All Rights Reserved</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageIcon>nuget-icon.png</PackageIcon>
@@ -23,17 +17,5 @@
     <Description>Lightweight JSON Serialization Library</Description>
     <RepositoryUrl>https://github.com/toptensoftware/jsonkit</RepositoryUrl>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="..\version.cs" Link="version.cs" />
-  </ItemGroup>
-
-  <Target Name="Code Sign" AfterTargets="Build" Condition="'$(Configuration)'=='Release' And '$(TargetFileName)'!=''">
-      <Exec Command="ttssign $(TargetDir)$(TargetFileName)" />
-  </Target>
-
-  <ItemGroup>
-      <None Include="../Artwork/nuget-icon.png" Pack="true" PackagePath=""/>
-  </ItemGroup>
 
 </Project>
