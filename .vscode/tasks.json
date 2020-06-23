@@ -5,19 +5,34 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "Build JsonKit",
             "command": "dotnet",
             "type": "shell",
             "args": [
                 "build",
-                // Ask dotnet build to generate full paths for file names.
-                "/property:GenerateFullPaths=true",
-                // Do not generate summary otherwise it leads to duplicate errors in Problems panel
-                "/consoleloggerparameters:NoSummary"
+                "/consoleloggerparameters:NoSummary",
+                "./Topten.JsonKit/Topten.JsonKit.csproj"
             ],
             "group": "build",
             "presentation": {
-                "reveal": "silent"
+                "reveal": "always",
+                "clear": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build Tests",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "/consoleloggerparameters:NoSummary",
+                "./Topten.JsonKit.Test/Topten.JsonKit.Test.csproj"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
             },
             "problemMatcher": "$msCompile"
         }
