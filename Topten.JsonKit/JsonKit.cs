@@ -25,9 +25,11 @@ namespace Topten.JsonKit
             WriteWhitespaceDefault = true;
             StrictParserDefault = false;
 
+#if !JSONKIT_NO_EMIT
             Json.SetFormatterResolver(Emit.MakeFormatter);
             Json.SetParserResolver(Emit.MakeParser);
             Json.SetIntoParserResolver(Emit.MakeIntoParser);
+#endif
         }
 
         // Pretty format default

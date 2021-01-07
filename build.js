@@ -13,7 +13,8 @@ if (bt.options.official)
 }
 
 // Build
-bt.run("dotnet build Topten.JsonKit -c Release")
+bt.run("dotnet build Topten.JsonKit\\Topten.JsonKit.csproj -c Release")
+bt.run("dotnet build Topten.JsonKit\\Topten.JsonKit.Lite.csproj -c Release")
 
 if (bt.options.official)
 {

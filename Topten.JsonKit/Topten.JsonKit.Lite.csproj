@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="../buildtools/Topten.props" />
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <DefineConstants>$(DefineConstants);JSONKIT_NO_EMIT</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <TtsCodeSign>True</TtsCodeSign>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Copyright>Copyright © 2014-2020 Topten Software.  All Rights Reserved</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageIcon>nuget-icon.png</PackageIcon>
+    <PackageProjectUrl>https://github.com/toptensoftware/jsonkit</PackageProjectUrl>
+    <PackageTags>JSON, Serialization</PackageTags>
+    <Description>Lightweight JSON Serialization Library (Lite Edition for .NET Standard 2.0)</Description>
+    <RepositoryUrl>https://github.com/toptensoftware/jsonkit</RepositoryUrl>
+  </PropertyGroup>
+
+</Project>

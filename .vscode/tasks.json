@@ -21,6 +21,22 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "Build JsonKit.Lite",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "/consoleloggerparameters:NoSummary",
+                "./Topten.JsonKit/Topten.JsonKit.Lite.csproj"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "Build Tests",
             "command": "dotnet",
             "type": "shell",
