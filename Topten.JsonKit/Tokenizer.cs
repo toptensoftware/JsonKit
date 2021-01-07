@@ -12,10 +12,6 @@
 // either express or implied. See the License for the specific language governing permissions 
 // and limitations under the License.
 
-// Define JsonKit_NO_DYNAMIC to disable Expando support
-// Define JsonKit_NO_EMIT to disable Reflection.Emit
-// Define JsonKit_NO_DATACONTRACT to disable support for [DataContract]/[DataMember]
-
 using System;
 using System.Collections.Generic;
 using System.Text;
