@@ -17,6 +17,9 @@ using System.Reflection;
 
 namespace Topten.JsonKit
 {
+    /// <summary>
+    /// An enumeration of JSON token types
+    /// </summary>
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public enum Token
     {

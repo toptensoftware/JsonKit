@@ -16,10 +16,15 @@ using System;
 
 namespace Topten.JsonKit
 {
-    // See comments for JsonAttribute above
+    /// <summary>
+    /// Indicates that the target element should be excluded from serialization
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class JsonExcludeAttribute : Attribute
     {
+        /// <summary>
+        /// Constructs a new JsonExclude attribute
+        /// </summary>
         public JsonExcludeAttribute()
         {
         }

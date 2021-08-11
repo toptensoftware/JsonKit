@@ -4,12 +4,15 @@
 
   <PropertyGroup>
     <TargetFrameworks>net46;netcoreapp2.1;net5.0</TargetFrameworks>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <TtsCodeSign>True</TtsCodeSign>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Copyright>Copyright © 2014-2020 Topten Software.  All Rights Reserved</Copyright>
+    <Copyright>Copyright © 2014-2021 Topten Software.  All Rights Reserved</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageIcon>nuget-icon.png</PackageIcon>
     <PackageProjectUrl>https://github.com/toptensoftware/jsonkit</PackageProjectUrl>
@@ -17,5 +20,13 @@
     <Description>Lightweight JSON Serialization Library</Description>
     <RepositoryUrl>https://github.com/toptensoftware/jsonkit</RepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
 
 </Project>

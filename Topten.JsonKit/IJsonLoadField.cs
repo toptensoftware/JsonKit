@@ -17,11 +17,19 @@ using System.Reflection;
 
 namespace Topten.JsonKit
 {
-    // Called for each field while loading from reflection
-    // Return true if handled
+    /// <summary>
+    /// Optional interface which if implemented on objects serialized will be called after
+    /// called for each field while loading.
+    /// </summary>
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonLoadField
     {
+        /// <summary>
+        /// Notifies the object that the field is being loaded
+        /// </summary>
+        /// <param name="r">The reader loading the JSON</param>
+        /// <param name="key">The key being loaded</param>
+        /// <returns>True if the field has been handled and doesn't need to be assigned by the loader</returns>
         bool OnJsonField(IJsonReader r, string key);
     }
 }

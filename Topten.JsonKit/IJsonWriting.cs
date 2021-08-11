@@ -17,10 +17,17 @@ using System.Reflection;
 
 namespace Topten.JsonKit
 {
-    // Called when about to write using reflection
+    /// <summary>
+    /// Optional interface which if implemented on objects serialized will be called just before
+    /// the object is saved.
+    /// </summary>
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonWriting
     {
+        /// <summary>
+        /// Notifies the object that it's about to be written
+        /// </summary>
+        /// <param name="w">The writer the object will be written to</param>
         void OnJsonWriting(IJsonWriter w);
     }
 }

@@ -17,26 +17,35 @@ using System;
 
 namespace Topten.JsonKit
 {
-    // Apply to enum values to specify which enum value to select
-    // if the supplied json value doesn't match any.
-    // If not found throws an exception
-    // eg, any unknown values in the json will be mapped to Fruit.unknown
-    //
-    //	 [JsonUnknown(Fruit.unknown)]
-    //   enum Fruit
-    //   {
-    // 		unknown,
-    //      Apple,
-    //      Pear,
-    //	 }
+    /// <summary>
+    /// Apply to enum values to specify which enum value to select
+    /// if the supplied json value doesn't match any.
+    /// If not found throws an exception
+    /// eg, any unknown values in the json will be mapped to Fruit.unknown
+    ///
+    ///	 [JsonUnknown(Fruit.unknown)]
+    ///   enum Fruit
+    ///   {
+    /// 		unknown,
+    ///      Apple,
+    ///      Pear,
+    ///	 }
+    /// </summary>
     [AttributeUsage(AttributeTargets.Enum)]
 	public class JsonUnknownAttribute : Attribute
 	{
+        /// <summary>
+        /// Constructs a new JsonUnknown attribute
+        /// </summary>
+        /// <param name="unknownValue">The value to be used for unknown enum values</param>
 		public JsonUnknownAttribute(object unknownValue)
 		{
 			UnknownValue = unknownValue;
 		}
 
+        /// <summary>
+        /// The value to be used for unknown enum values
+        /// </summary>
 		public object UnknownValue
 		{
 			get;

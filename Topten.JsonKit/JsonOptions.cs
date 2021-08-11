@@ -16,17 +16,50 @@ using System;
 
 namespace Topten.JsonKit
 {
-    // Pass to format/write/parse functions to override defaults
+    /// <summary>
+    /// Options to controls formatting/parsing and write behaviour
+    /// </summary>
     [Flags]
     public enum JsonOptions
     {
+        /// <summary>
+        /// No special options
+        /// </summary>
         None = 0,
+
+        /// <summary>
+        /// Force writing of whitespace (pretty print)
+        /// </summary>
         WriteWhitespace  = 0x00000001,
+
+        /// <summary>
+        /// Disable writing of whitespace
+        /// </summary>
         DontWriteWhitespace = 0x00000002,
+
+        /// <summary>
+        /// Enforce strict parsing (comments, array commas etc..)
+        /// </summary>
         StrictParser = 0x00000004,
+
+        /// <summary>
+        /// Relax some parsing rules
+        /// </summary>
         NonStrictParser = 0x00000008,
+
+        /// <summary>
+        /// Flush the textwriter stream when finished writing
+        /// </summary>
         Flush = 0x00000010,
-        AutoSavePreviousVersion = 0x00000020,       // Use "SavePreviousVersions" static property
-        SavePreviousVersion = 0x00000040,           // Always save previous version
+
+        /// <summary>
+        /// Use the Json.SavePreviousVersion property to control saving previous versions
+        /// </summary>
+        AutoSavePreviousVersion = 0x00000020,
+
+        /// <summary>
+        /// Always save a previous version
+        /// </summary>
+        SavePreviousVersion = 0x00000040,           
     }
 }

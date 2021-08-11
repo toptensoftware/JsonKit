@@ -17,7 +17,9 @@ using System.IO;
 
 namespace Topten.JsonKit
 {
-    // API
+    /// <summary>
+    /// The main static interface class to JsonKit
+    /// </summary>
     public static class Json
     {
         static Json()
@@ -32,14 +34,18 @@ namespace Topten.JsonKit
 #endif
         }
 
-        // Pretty format default
+        /// <summary>
+        /// Controls whether the write whitespace by default
+        /// </summary>
         public static bool WriteWhitespaceDefault
         {
             get;
             set;
         }
 
-        // Strict parser
+        /// <summary>
+        /// Controls whether parsing should be strict by default
+        /// </summary>
         public static bool StrictParserDefault
         {
             get;
@@ -47,20 +53,36 @@ namespace Topten.JsonKit
         }
 
         // Write an object to a text writer
+        /// <summary>
+        /// Writes an object to a TextWriter
+        /// </summary>
+        /// <param name="w">The target text writer</param>
+        /// <param name="o">The object to be written</param>
+        /// <param name="options">Options controlling output formatting</param>
         public static void Write(TextWriter w, object o, JsonOptions options = JsonOptions.None)
         {
             var writer = new JsonWriter(w, ResolveOptions(options));
             writer.WriteValue(o);
         }
 
+
+        /// <summary>
+        /// Controls whether previous version should be saved if AutoSavePreviousVersion is used
+        /// </summary>
         public static bool SavePreviousVersions
         {
             get;
             set;
         }
 
-        // Write a file atomically by writing to a temp file and then renaming it - prevents corrupted files if crash 
-        // in middle of writing file.
+        /// <summary>
+        /// Write a file atomically by writing to a temp file and then renaming it - prevents corrupted files if crash 
+        /// in middle of writing file.
+        /// </summary>
+        /// <param name="filename">The output file name</param>
+        /// <param name="o">The object to be written</param>
+        /// <param name="options">Options controlling output</param>
+        /// <param name="backupFilename">An optional back filename where previous version will be written</param>
         public static void WriteFileAtomic(string filename, object o, JsonOptions options = JsonOptions.None, string backupFilename = null)
         {
             var tempName = filename + ".tmp";
@@ -132,7 +154,12 @@ namespace Topten.JsonKit
             }
         }
 
-        // Write an object to a file
+        /// <summary>
+        /// Write an object to a file
+        /// </summary>
+        /// <param name="filename">The output filename</param>
+        /// <param name="o">The object to be written</param>
+        /// <param name="options">Options controlling output</param>
         public static void WriteFile(string filename, object o, JsonOptions options = JsonOptions.None)
         {
             using (var w = new StreamWriter(filename))
@@ -147,7 +174,12 @@ namespace Topten.JsonKit
             }
         }
 
-        // Format an object as a json string
+        /// <summary>
+        /// Format an object as a json string
+        /// </summary>
+        /// <param name="o">The value to be formatted</param>
+        /// <param name="options">Options controlling output</param>
+        /// <returns>The formatted string</returns>
         public static string Format(object o, JsonOptions options = JsonOptions.None)
         {
             var sw = new StringWriter();
@@ -156,7 +188,13 @@ namespace Topten.JsonKit
             return sw.ToString();
         }
 
-        // Parse an object of specified type from a text reader
+        /// <summary>
+        /// Parse an object of specified type from a text reader 
+        /// </summary>
+        /// <param name="r">The text reader to read from</param>
+        /// <param name="type">The type of object to be parsed</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns>The parsed object</returns>
         public static object Parse(TextReader r, Type type, JsonOptions options = JsonOptions.None)
         {
             JsonReader reader = null;
@@ -175,13 +213,24 @@ namespace Topten.JsonKit
             }
         }
 
-        // Parse an object of specified type from a text reader
+        /// <summary>
+        /// Parse an object of specified type from a text reader 
+        /// </summary>
+        /// <typeparam name="T">The type of object to be parsed</typeparam>
+        /// <param name="r">The text reader to read from</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns>The parsed object</returns>
         public static T Parse<T>(TextReader r, JsonOptions options = JsonOptions.None)
         {
             return (T)Parse(r, typeof(T), options);
         }
 
-        // Parse from text reader into an already instantied object
+        /// <summary>
+        /// Parse from text reader into an already instantied object 
+        /// </summary>
+        /// <param name="r">The text reader to read from </param>
+        /// <param name="into">The object to serialize into</param>
+        /// <param name="options">Options controlling parsing</param>
         public static void ParseInto(TextReader r, Object into, JsonOptions options = JsonOptions.None)
         {
             if (into == null)
@@ -204,7 +253,13 @@ namespace Topten.JsonKit
             }
         }
 
-        // Parse an object of specified type from a file
+        /// <summary>
+        /// Parse an object of specified type from a file
+        /// </summary>
+        /// <param name="filename">The input filename</param>
+        /// <param name="type">The type of object to be parsed</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns>The parsed object instance</returns>
         public static object ParseFile(string filename, Type type, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -214,6 +269,13 @@ namespace Topten.JsonKit
         }
 
         // Parse an object of specified type from a file
+        /// <summary>
+        /// Parse an object of specified type from a file
+        /// </summary>
+        /// <typeparam name="T">The type of object to be parsed</typeparam>
+        /// <param name="filename">The input filename</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns></returns>
         public static T ParseFile<T>(string filename, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -222,7 +284,12 @@ namespace Topten.JsonKit
             }
         }
 
-        // Parse from file into an already instantied object
+        /// <summary>
+        /// Parse from file into an already instantied object 
+        /// </summary>
+        /// <param name="filename">The input filename</param>
+        /// <param name="into">The object to serialize into</param>
+        /// <param name="options">Options controlling parsing</param>
         public static void ParseFileInto(string filename, Object into, JsonOptions options = JsonOptions.None)
         {
             using (var r = new StreamReader(filename))
@@ -231,44 +298,80 @@ namespace Topten.JsonKit
             }
         }
 
-        // Parse an object from a string
+        /// <summary>
+        /// Parse an object from a string 
+        /// </summary>
+        /// <param name="data">The JSON data</param>
+        /// <param name="type">The type of object to be parsed</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns>The parsed object instance</returns>
         public static object Parse(string data, Type type, JsonOptions options = JsonOptions.None)
         {
             return Parse(new StringReader(data), type, options);
         }
 
-        // Parse an object from a string
+        /// <summary>
+        /// Parse an object from a string 
+        /// </summary>
+        /// <typeparam name="T">The type of object to be parsed</typeparam>
+        /// <param name="data">The JSON data</param>
+        /// <param name="options">Options controlling parsing</param>
+        /// <returns></returns>
         public static T Parse<T>(string data, JsonOptions options = JsonOptions.None)
         {
             return (T)Parse<T>(new StringReader(data), options);
         }
 
-        // Parse from string into an already instantiated object
+        /// <summary>
+        /// Parse from string into an already instantiated object 
+        /// </summary>
+        /// <param name="data">The JSON data</param>
+        /// <param name="into">The object to serialize into</param>
+        /// <param name="options">Options controlling parsing</param>
         public static void ParseInto(string data, Object into, JsonOptions options = JsonOptions.None)
         {
             ParseInto(new StringReader(data), into, options);
         }
 
-        // Create a clone of an object
+        /// <summary>
+        /// Create a clone of an object by serializing to JSON and the deserializing into a new instance
+        /// </summary>
+        /// <typeparam name="T">The type of object to be cloned</typeparam>
+        /// <param name="source">The object to be cloned</param>
+        /// <returns>A cloned instance</returns>
         public static T Clone<T>(T source)
         {
             return (T)Reparse(source.GetType(), source);
         }
 
         // Create a clone of an object (untyped)
+        /// <summary>
+        /// Create a clone of an object by serializing to JSON and the deserializing into a new instance
+        /// </summary>
+        /// <param name="source">The object to be cloned</param>
+        /// <returns>A cloned instance</returns>
         public static object Clone(object source)
         {
             return Reparse(source.GetType(), source);
         }
 
-        // Clone an object into another instance
+        /// <summary>
+        /// Clone an object into another instance 
+        /// </summary>
+        /// <param name="dest">The object to clone to</param>
+        /// <param name="source">The object to clone from</param>
         public static void CloneInto(object dest, object source)
         {
             ReparseInto(dest, source);
         }
 
-        // Reparse an object by writing to a stream and re-reading (possibly
-        // as a different type).
+        /// <summary>
+        /// Reparse an object by writing to a stream and re-reading (possibly
+        /// as a different type).
+        /// </summary>
+        /// <param name="type">The type of object to deserialize as</param>
+        /// <param name="source">The source object to be reparsed</param>
+        /// <returns>The newly parsed object instance</returns>
         public static object Reparse(Type type, object source)
         {
             if (source == null)
@@ -292,13 +395,23 @@ namespace Topten.JsonKit
             }
         }
 
-        // Typed version of above
+        /// <summary>
+        /// Reparse an object by writing to a stream and re-reading (possibly
+        /// as a different type).
+        /// </summary>
+        /// <typeparam name="T">The type of object to deserialize as</typeparam>
+        /// <param name="source">The source object to be reparsed</param>
+        /// <returns>The newly parsed object instance</returns>
         public static T Reparse<T>(object source)
         {
             return (T)Reparse(typeof(T), source);
         }
 
-        // Reparse one object into another object 
+        /// <summary>
+        /// Reparse one object into another object  
+        /// </summary>
+        /// <param name="dest">The destination object</param>
+        /// <param name="source">The source object</param>
         public static void ReparseInto(object dest, object source)
         {
             var ms = new MemoryStream();
@@ -320,82 +433,126 @@ namespace Topten.JsonKit
             }
         }
 
-        // Register a callback that can format a value of a particular type into json
+        /// <summary>
+        /// Register a callback that can format a value of a particular type into json 
+        /// </summary>
+        /// <param name="type">The type of object to be formatted</param>
+        /// <param name="formatter">The formatter callback</param>
         public static void RegisterFormatter(Type type, Action<IJsonWriter, object> formatter)
         {
             JsonWriter._formatters[type] = formatter;
         }
 
-        // Typed version of above
+        /// <summary>
+        /// Register a callback that can format a value of a particular type into json 
+        /// </summary>
+        /// <typeparam name="T">The type of object to be formatted</typeparam>
+        /// <param name="formatter">The formatter callback</param>
         public static void RegisterFormatter<T>(Action<IJsonWriter, T> formatter)
         {
             RegisterFormatter(typeof(T), (w, o) => formatter(w, (T)o));
         }
 
-        // Register a parser for a specified type
+        /// <summary>
+        /// Register a parser for a specified type
+        /// </summary>
+        /// <param name="type">The type of object to be parsed</param>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterParser(Type type, Func<IJsonReader, Type, object> parser)
         {
             JsonReader._parsers.Set(type, parser);
         }
 
-        // Register a typed parser
+        /// <summary>
+        /// Register a parser for a specified type
+        /// </summary>
+        /// <typeparam name="T">The type of object to be parsed</typeparam>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterParser<T>(Func<IJsonReader, Type, T> parser)
         {
             RegisterParser(typeof(T), (r, t) => parser(r, t));
         }
 
-        // Simpler version for simple types
+        /// <summary>
+        /// Registers a parser for a simple literal type
+        /// </summary>
+        /// <param name="type">The type to be parsed</param>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterParser(Type type, Func<object, object> parser)
         {
             RegisterParser(type, (r, t) => r.ReadLiteral(parser));
         }
 
-        // Simpler and typesafe parser for simple types
+        /// <summary>
+        /// Register a parser for a simple literal type
+        /// </summary>
+        /// <typeparam name="T">The type to be parsed</typeparam>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterParser<T>(Func<object, T> parser)
         {
             RegisterParser(typeof(T), literal => parser(literal));
         }
 
-        // Register an into parser
+        /// <summary>
+        /// Register a parser for loading into an existing instance
+        /// </summary>
+        /// <param name="type">The type to be parsed</param>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterIntoParser(Type type, Action<IJsonReader, object> parser)
         {
             JsonReader._intoParsers.Set(type, parser);
         }
 
-        // Register an into parser
+
+        /// <summary>
+        /// Register a parser for loading into an existing instance
+        /// </summary>
+        /// <typeparam name="T">The type to be parsed</typeparam>
+        /// <param name="parser">The parser callback</param>
         public static void RegisterIntoParser<T>(Action<IJsonReader, object> parser)
         {
             RegisterIntoParser(typeof(T), parser);
         }
 
-        // Register a factory for instantiating objects (typically abstract classes)
-        // Callback will be invoked for each key in the dictionary until it returns an object
-        // instance and which point it will switch to serialization using reflection
+        /// <summary>
+        /// Register a factory for instantiating objects (typically abstract classes)
+        /// Callback will be invoked for each key in the dictionary until it returns an object
+        /// instance and which point it will switch to serialization using reflection
+        /// </summary>
+        /// <param name="type">The type to be instantiated</param>
+        /// <param name="factory">The factory callback</param>
         public static void RegisterTypeFactory(Type type, Func<IJsonReader, string, object> factory)
         {
             JsonReader._typeFactories.Set(type, factory);
         }
 
-        // Register a callback to provide a formatter for a newly encountered type
+        /// <summary>
+        /// Register a callback to provide a formatter for a newly encountered type 
+        /// </summary>
+        /// <param name="resolver">The resolver callback</param>
         public static void SetFormatterResolver(Func<Type, Action<IJsonWriter, object>> resolver)
         {
             JsonWriter._formatterResolver = resolver;
         }
 
-        // Register a callback to provide a parser for a newly encountered value type
+        /// <summary>
+        /// Register a callback to provide a parser for a newly encountered value type 
+        /// </summary>
+        /// <param name="resolver">The resolver callback</param>
         public static void SetParserResolver(Func<Type, Func<IJsonReader, Type, object>> resolver)
         {
             JsonReader._parserResolver = resolver;
         }
 
-        // Register a callback to provide a parser for a newly encountered reference type
+        /// <summary>
+        /// Register a callback to provide a parser for a newly encountered reference type 
+        /// </summary>
+        /// <param name="resolver"></param>
         public static void SetIntoParserResolver(Func<Type, Action<IJsonReader, object>> resolver)
         {
             JsonReader._intoParserResolver = resolver;
         }
 
-
-        // Resolve passed options        
         static JsonOptions ResolveOptions(JsonOptions options)
         {
             JsonOptions resolved = JsonOptions.None;

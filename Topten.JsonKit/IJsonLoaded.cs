@@ -18,10 +18,17 @@ using System.Reflection;
 
 namespace Topten.JsonKit
 {
-    // Called after loading via reflection
+    /// <summary>
+    /// Optional interface which if implemented on objects serialized will be called after
+    /// the object has been loaded
+    /// </summary>
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public interface IJsonLoaded
     {
+        /// <summary>
+        /// Notifies the object that it's been loaded via JSON
+        /// </summary>
+        /// <param name="r">The reader that loaded the object</param>
         void OnJsonLoaded(IJsonReader r);
     }
 }

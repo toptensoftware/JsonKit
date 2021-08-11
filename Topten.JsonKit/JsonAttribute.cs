@@ -16,56 +16,100 @@ using System;
 
 namespace Topten.JsonKit
 {
-    // Used to decorate fields and properties that should be serialized
-    //
-    // - [Json] on class or struct causes all public fields and properties to be serialized
-    // - [Json] on a public or non-public field or property causes that member to be serialized
-    // - [JsonExclude] on a field or property causes that field to be not serialized
-    // - A class or struct with no [Json] attribute has all public fields/properties serialized
-    // - A class or struct with no [Json] attribute but a [Json] attribute on one or more members only serializes those members
-    //
-    // Use [Json("keyname")] to explicitly specify the key to be used 
-    // [Json] without the keyname will be serialized using the name of the member with the first letter lowercased.
-    //
-    // [Json(KeepInstance=true)] causes container/subobject types to be serialized into the existing member instance (if not null)
-    //
-    // You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
-    // are no JsonKit attributes on the class or it's members. You must specify DataContract on the type and
-    // DataMember on any fields/properties that require serialization.  There's no need for exclude attribute.
-    // When using DataMember, the name of the field or property is used as is - the first letter is left in upper case
-    //
+    /// <summary>
+    /// Used to decorate fields and properties that should be serialized
+    /// </summary>
+    /// <remarks>
+    /// - [Json] on class or struct causes all public fields and properties to be serialized
+    /// - [Json] on a public or non-public field or property causes that member to be serialized
+    /// - [JsonExclude] on a field or property causes that field to be not serialized
+    /// - A class or struct with no [Json] attribute has all public fields/properties serialized
+    /// - A class or struct with no [Json] attribute but a [Json] attribute on one or more members only serializes those members
+    ///
+    /// Use [Json("keyname")] to explicitly specify the key to be used 
+    /// [Json] without the keyname will be serialized using the name of the member with the first letter lowercased.
+    ///
+    /// [Json(KeepInstance=true)] causes container/subobject types to be serialized into the existing member instance (if not null)
+    ///
+    /// You can also use the system supplied DataContract and DataMember attributes.  They'll only be used if there
+    /// are no JsonKit attributes on the class or it's members. You must specify DataContract on the type and
+    /// DataMember on any fields/properties that require serialization.  There's no need for exclude attribute.
+    /// When using DataMember, the name of the field or property is used as is - the first letter is left in upper case
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
     public class JsonAttribute : Attribute
     {
+        /// <summary>
+        /// Constructs a new Json attribute
+        /// </summary>
         public JsonAttribute()
         {
-            _key = null;
+            Key = null;
         }
 
+        /// <summary>
+        /// Constructs a new Json attribute, setting the key used for serialization of this item
+        /// </summary>
+        /// <param name="key"></param>
         public JsonAttribute(string key)
         {
-            _key = key;
+            Key = key;
         }
 
-        // Key used to save this field/property
-        string _key;
+
+        /// <summary>
+        /// Gets the serialization key for this Json item
+        /// </summary>
         public string Key
         {
-            get { return _key; }
+            get;
+            private set;
         }
 
-        // If true uses ParseInto to parse into the existing object instance
-        // If false, creates a new instance as assigns it to the property
+        /// <summary>
+        /// Controls whether a collection is serialized by creating and assigning a new
+        /// instance, or by clearing and serializing into the existing instance.
+        /// </summary>
+        /// <remarks>
+        /// If true uses ParseInto to parse into the existing object instance
+        /// If false, creates a new instance as assigns it to the property
+        /// </remarks>
         public bool KeepInstance
         {
             get;
             set;
         }
 
-        // If true, the property will be loaded, but not saved
-        // Use to upgrade deprecated persisted settings, but not
-        // write them back out again
+        /// <summary>
+        /// Used to decorate deprecated properties that should be loaded
+        /// but not saved.
+        /// </summary>
+        /// <remarks>
+        /// If true, the property will be loaded, but not saved
+        /// Use to upgrade deprecated persisted settings, but not
+        /// write them back out again
+        /// </remarks>
         public bool Deprecated
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// For non-value types controls whether null values should be
+        /// written as null, or excluded for output.
+        /// </summary>
+        public bool ExcludeIfNull
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// For collection types controls whether they should be serialized
+        /// if the collection is empty.
+        /// </summary>
+        public bool ExcludeIfEmpty
         {
             get;
             set;

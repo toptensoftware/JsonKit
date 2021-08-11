@@ -16,16 +16,32 @@ using System;
 
 namespace Topten.JsonKit
 {
-    // Exception thrown for any parse error
+    /// <summary>
+    /// Exception thrown for any parse error 
+    /// </summary>
     public class JsonParseException : Exception
     {
+        /// <summary>
+        /// Constructs a new JsonParseException
+        /// </summary>
+        /// <param name="inner">The inner exception</param>
+        /// <param name="context">A string describing the context of the serialization (parent key path)</param>
+        /// <param name="position">The position in the JSON stream where the error occured</param>
         public JsonParseException(Exception inner, string context, LineOffset position) : 
             base(string.Format("JSON parse error at {0}{1} - {2}", position, string.IsNullOrEmpty(context) ? "" : string.Format(", context {0}", context), inner.Message), inner)
         {
             Position = position;
             Context = context;
         }
-        public LineOffset Position;
-        public string Context;
+
+        /// <summary>
+        /// The position in the JSON stream where the error occured
+        /// </summary>
+        public LineOffset Position { get; private set; }
+
+        /// <summary>
+        /// A string describing the context of the serialization (parent key path)
+        /// </summary>
+        public string Context { get; private set; }
     }
 }

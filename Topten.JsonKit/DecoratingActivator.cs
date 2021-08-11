@@ -19,7 +19,7 @@ using System;
 namespace Topten.JsonKit
 {
     // Helper to create instances but include the type name in the thrown exception
-    public static class DecoratingActivator
+    static class DecoratingActivator
     {
         public static object CreateInstance(Type t)
         {

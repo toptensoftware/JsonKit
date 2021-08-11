@@ -21,14 +21,28 @@ namespace Topten.JsonKit
     // Information about a field or property found through reflection
     class JsonMemberInfo
     {
+        public JsonMemberInfo()
+        {
+        }
         // The Json key for this member
         public string JsonKey;
 
         // True if should keep existing instance (reference types only)
-        public bool KeepInstance;
+        public bool KeepInstance => Attribute?.KeepInstance ?? false;
 
         // True if deprecated
-        public bool Deprecated;
+        public bool Deprecated => Attribute?.Deprecated ?? false;
+
+        // True if should be excluded when null
+        public bool ExcludeIfNull => Attribute?.ExcludeIfNull ?? false;
+
+        // The JSON attribute for the member info
+        public JsonAttribute Attribute
+        {
+            get;
+            set;
+        }
+
 
         // Reflected member info
         MemberInfo _mi;

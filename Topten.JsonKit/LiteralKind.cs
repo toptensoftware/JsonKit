@@ -14,16 +14,49 @@
 
 namespace Topten.JsonKit
 {
-    // Describes the current literal in the json stream
+    /// <summary>
+    /// Describes the current literal in the json stream
+    /// </summary>
     public enum LiteralKind
     {
+        /// <summary>
+        /// Not currently on a literal
+        /// </summary>
         None,
+
+        /// <summary>
+        /// A string literal
+        /// </summary>
         String,
+
+        /// <summary>
+        /// The value `null`
+        /// </summary>
         Null,
+
+        /// <summary>
+        /// The value `true`
+        /// </summary>
         True,
+
+        /// <summary>
+        /// The value `false`
+        /// </summary>
         False,
+
+        /// <summary>
+        /// A signed integer
+        /// </summary>
         SignedInteger,
+
+        /// <summary>
+        /// An unsigned integer
+        /// </summary>
         UnsignedInteger,
+
+        /// <summary>
+        /// A floating point value
+        /// </summary>
         FloatingPoint,
     }
 }

@@ -22,14 +22,12 @@ using System.Reflection;
 using System.Globalization;
 using System.Reflection.Emit;
 
-
-
 namespace Topten.JsonKit
 {
     static class Emit
     {
 
-        // Generates a function that when passed an object of specified type, renders it to an IJsonReader
+        // Generates a function that when passed an object of specified type, renders it to an IJsonWriter
         public static Action<IJsonWriter, object> MakeFormatter(Type type)
         {
             var formatJson = ReflectionInfo.FindFormatJson(type);
@@ -81,15 +79,15 @@ namespace Topten.JsonKit
 
                 // These are the types we'll call .ToString(Culture.InvariantCulture) on
                 var toStringTypes = new Type[] { 
-                typeof(int), typeof(uint), typeof(long), typeof(ulong), 
-                typeof(short), typeof(ushort), typeof(decimal), 
-                typeof(byte), typeof(sbyte)
-            };
+                    typeof(int), typeof(uint), typeof(long), typeof(ulong), 
+                    typeof(short), typeof(ushort), typeof(decimal), 
+                    typeof(byte), typeof(sbyte)
+                };
 
                 // Theses types we also generate for
                 var otherSupportedTypes = new Type[] {
-                typeof(double), typeof(float), typeof(string), typeof(char)
-            };
+                    typeof(double), typeof(float), typeof(string), typeof(char)
+                };
 
                 // Call IJsonWriting if implemented
                 if (typeof(IJsonWriting).IsAssignableFrom(type))
@@ -124,11 +122,6 @@ namespace Topten.JsonKit
                     {
                         continue;
                     }
-
-                    // Write the Json key
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldstr, m.JsonKey);
-                    il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteKeyNoEscaping", new Type[] { typeof(string) }));
 
                     // Load the writer
                     il.Emit(OpCodes.Ldarg_0);
@@ -185,31 +178,49 @@ namespace Topten.JsonKit
                         }
                     }
 
-                    Label? lblFinished = null;
+                    Label lblFinished = il.DefineLabel();
+
+                    void EmitWriteKey()
+                    {
+                        // Write the Json key
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldstr, m.JsonKey);
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteKeyNoEscaping", new Type[] { typeof(string) }));
+                    }
 
                     // Is it a nullable type?
                     var typeUnderlying = Nullable.GetUnderlyingType(memberType);
                     if (typeUnderlying != null)
                     {
-                        // Duplicate the address so we can call get_HasValue() and then get_Value()
-                        il.Emit(OpCodes.Dup);
-
                         // Define some labels
                         var lblHasValue = il.DefineLabel();
-                        lblFinished = il.DefineLabel();
 
-                        // Call has_Value
+                        // Call HasValue
+                        il.Emit(OpCodes.Dup);
                         il.Emit(OpCodes.Call, memberType.GetProperty("HasValue").GetGetMethod());
                         il.Emit(OpCodes.Brtrue, lblHasValue);
 
-                        // No value, write "null:
-                        il.Emit(OpCodes.Pop);
-                        il.Emit(OpCodes.Ldstr, "null");
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
-                        il.Emit(OpCodes.Br_S, lblFinished.Value);
+                        // HasValue returned false, so either omit the key entirely, or write it as "null"
+                        if (m.ExcludeIfNull)
+                        {
+                            il.Emit(OpCodes.Pop);       // Pop value
+                            il.Emit(OpCodes.Pop);       // Pop writer
+                        }
+                        else
+                        {
+                            // Write the key
+                            EmitWriteKey();
+
+                            // No value, write "null:
+                            il.Emit(OpCodes.Pop);
+                            il.Emit(OpCodes.Ldstr, "null");
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
+                        }
+                        il.Emit(OpCodes.Br_S, lblFinished);
 
                         // Get it's value
                         il.MarkLabel(lblHasValue);
+                        EmitWriteKey();
                         il.Emit(OpCodes.Call, memberType.GetProperty("Value").GetGetMethod());
 
                         // Switch to the underlying type from here on
@@ -223,6 +234,26 @@ namespace Topten.JsonKit
                             il.Emit(OpCodes.Stloc, locTemp);
                             il.Emit(OpCodes.Ldloca, locTemp);
                         }
+                    }
+                    else
+                    {
+                        if (m.ExcludeIfNull && !type.IsValueType)
+                        {
+                            var lblContinue = il.DefineLabel();
+                            System.Diagnostics.Debug.Assert(!NeedValueAddress);
+                            il.Emit(OpCodes.Dup);
+                            il.Emit(OpCodes.Brtrue_S, lblContinue);
+
+                            il.Emit(OpCodes.Pop);           // Pop value
+                            il.Emit(OpCodes.Pop);           // Pop writer
+
+                            // Define some labels
+                            il.Emit(OpCodes.Br_S, lblFinished);
+
+                            il.MarkLabel(lblContinue);
+                        }
+
+                        EmitWriteKey();
                     }
 
                     // ToString()
@@ -282,8 +313,7 @@ namespace Topten.JsonKit
                         il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteValue", new Type[] { typeof(object) }));
                     }
 
-                    if (lblFinished.HasValue)
-                        il.MarkLabel(lblFinished.Value);
+                    il.MarkLabel(lblFinished);
                 }
 
                 // Call IJsonWritten

@@ -23,6 +23,9 @@ using System.Dynamic;
 
 namespace Topten.JsonKit
 {
+    /// <summary>
+    /// Implements the IJsonReader interface
+    /// </summary>
     public class JsonReader : IJsonReader
     {
         static JsonReader()
@@ -96,6 +99,11 @@ namespace Topten.JsonKit
             });
         }
 
+        /// <summary>
+        /// Constructs a new JsonReader
+        /// </summary>
+        /// <param name="r">The input TextReader stream</param>
+        /// <param name="options">Options controlling parsing behaviour</param>
         public JsonReader(TextReader r, JsonOptions options)
         {
             _tokenizer = new Tokenizer(r, options);
@@ -106,6 +114,9 @@ namespace Topten.JsonKit
         JsonOptions _options;
         List<string> _contextStack = new List<string>();
 
+        /// <summary>
+        /// Gets the current parse context (ie: parent key path)
+        /// </summary>
         public string Context
         {
             get
@@ -156,11 +167,15 @@ namespace Topten.JsonKit
             };
         }
 
+        /// <summary>
+        /// Gets the current position in the input stream
+        /// </summary>
         public LineOffset CurrentTokenPosition
         {
             get { return _tokenizer.CurrentTokenPosition; }
         }
 
+        /// <inheritdoc />
         public Token CurrentToken
         {
             get { return _tokenizer.CurrentToken; }
@@ -171,6 +186,8 @@ namespace Topten.JsonKit
         // errors on converting to the target type are thrown before the tokenizer
         // is advanced to the next token.  This ensures error location is reported 
         // at the start of the literal, not the following token.
+
+        /// <inheritdoc />
         public object ReadLiteral(Func<object, object> converter)
         {
             _tokenizer.Check(Token.Literal);
@@ -179,11 +196,15 @@ namespace Topten.JsonKit
             return retv;
         }
 
+        /// <summary>
+        /// Checks for EOF and throws an exception if not
+        /// </summary>
         public void CheckEOF()
         {
             _tokenizer.Check(Token.EOF);
         }
 
+        /// <inheritdoc />
         public object Parse(Type type)
         {
             // Null?
@@ -378,7 +399,7 @@ namespace Topten.JsonKit
             throw new InvalidDataException(string.Format("syntax error, unexpected token {0}", _tokenizer.CurrentToken));
         }
 
-        // Parse into an existing object instance
+        /// <inheritdoc />
         public void ParseInto(object into)
         {
             if (into == null)
@@ -472,27 +493,31 @@ namespace Topten.JsonKit
             throw new InvalidOperationException(string.Format("Don't know how to parse into type '{0}'", type.FullName));
         }
 
+        /// <inheritdoc />
         public T Parse<T>()
         {
             return (T)Parse(typeof(T));
         }
 
+        /// <inheritdoc />
         public LiteralKind GetLiteralKind() 
         { 
             return _tokenizer.LiteralKind; 
         }
-            
+
+        /// <inheritdoc />
         public string GetLiteralString() 
         { 
             return _tokenizer.String; 
         }
 
+        /// <inheritdoc />
         public void NextToken() 
         { 
             _tokenizer.NextToken(); 
         }
 
-        // Parse a dictionary
+        /// <inheritdoc />
         public void ParseDictionary(Action<string> callback)
         {
             _tokenizer.Skip(Token.OpenBrace);
@@ -555,7 +580,7 @@ namespace Topten.JsonKit
             }
         }
 
-        // Parse an array
+        /// <inheritdoc />
         public void ParseArray(Action callback)
         {
             _tokenizer.Skip(Token.OpenSquare);

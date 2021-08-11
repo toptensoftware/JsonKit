@@ -74,8 +74,13 @@ namespace Topten.JsonKit
 
                 foreach (var jmi in Members.Where(x=>!x.Deprecated))
                 {
+                    // Exclude null?
+                    var mval = jmi.GetValue(val);
+                    if (mval == null && jmi.ExcludeIfNull)
+                        continue;
+
                     w.WriteKeyNoEscaping(jmi.JsonKey);
-                    w.WriteValue(jmi.GetValue(val));
+                    w.WriteValue(mval);
                 }
 
                 var written = val as IJsonWritten;
@@ -213,8 +218,7 @@ namespace Topten.JsonKit
                             {
                                 Member = mi,
                                 JsonKey = attr.Key ?? mi.Name.Substring(0, 1).ToLower() + mi.Name.Substring(1),
-                                KeepInstance = attr.KeepInstance,
-                                Deprecated = attr.Deprecated,
+                                Attribute = attr,
                             };
                         }
 

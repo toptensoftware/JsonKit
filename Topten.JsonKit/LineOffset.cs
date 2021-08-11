@@ -14,11 +14,22 @@
 
 namespace Topten.JsonKit
 {
-    // Represents a line and character offset position in the source Json
+    /// <summary>
+    /// Represents a line and character offset position in the source Json
+    /// </summary>
     public struct LineOffset
     {
+        /// <summary>
+        /// The zero based line number
+        /// </summary>
         public int Line;
+
+        /// <summary>
+        /// The zero based character offset
+        /// </summary>
         public int Offset;
+
+        /// <inheritdoc />
         public override string ToString()
         {
             return string.Format("line {0}, character {1}", Line + 1, Offset + 1);
