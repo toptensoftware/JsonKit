@@ -123,63 +123,26 @@ namespace Topten.JsonKit
                         continue;
                     }
 
-                    // Load the writer
-                    il.Emit(OpCodes.Ldarg_0);
-
                     // Get the member type
                     var memberType = m.MemberType;
 
-                    // Load the target object
-                    if (type.IsValueType)
-                    {
-                        il.Emit(OpCodes.Ldloca, locTypedObj);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Ldloc, locTypedObj);
-                    }
-
-                    // Work out if we need the value or it's address on the stack
-                    bool NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
-                    if (Nullable.GetUnderlyingType(memberType) != null)
-                    {
-                        NeedValueAddress = true;
-                    }
-
-                    // Property?
+                    // Get the field/property value and store it in a local
+                    LocalBuilder locValue = il.DeclareLocal(memberType);
+                    il.Emit(type.IsValueType ? OpCodes.Ldloca : OpCodes.Ldloc, locTypedObj);
                     if (pi != null)
                     {
-                        // Call property's get method
-                        if (type.IsValueType)
-                            il.Emit(OpCodes.Call, pi.GetGetMethod(true));
-                        else
-                            il.Emit(OpCodes.Callvirt, pi.GetGetMethod(true));
-
-                        // If we need the address then store in a local and take it's address
-                        if (NeedValueAddress)
-                        {
-                            var locTemp = il.DeclareLocal(memberType);
-                            il.Emit(OpCodes.Stloc, locTemp);
-                            il.Emit(OpCodes.Ldloca, locTemp);
-                        }
+                        il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, pi.GetGetMethod(true));
                     }
-
-                    // Field?
-                    var fi = m.Member as FieldInfo;
-                    if (fi != null)
+                    if (m.Member is FieldInfo fi)
                     {
-                        if (NeedValueAddress)
-                        {
-                            il.Emit(OpCodes.Ldflda, fi);
-                        }
-                        else
-                        {
-                            il.Emit(OpCodes.Ldfld, fi);
-                        }
+                        il.Emit(OpCodes.Ldfld, fi);
                     }
+                    il.Emit(OpCodes.Stloc, locValue);
 
-                    Label lblFinished = il.DefineLabel();
+                    // A label for early exit if not writing this member
+                    Label lblFinishedMember = il.DefineLabel();
 
+                    // Helper to generate IL to write the key
                     void EmitWriteKey()
                     {
                         // Write the Json key
@@ -196,70 +159,57 @@ namespace Topten.JsonKit
                         var lblHasValue = il.DefineLabel();
 
                         // Call HasValue
-                        il.Emit(OpCodes.Dup);
+                        il.Emit(OpCodes.Ldloca, locValue);
                         il.Emit(OpCodes.Call, memberType.GetProperty("HasValue").GetGetMethod());
                         il.Emit(OpCodes.Brtrue, lblHasValue);
 
                         // HasValue returned false, so either omit the key entirely, or write it as "null"
-                        if (m.ExcludeIfNull)
-                        {
-                            il.Emit(OpCodes.Pop);       // Pop value
-                            il.Emit(OpCodes.Pop);       // Pop writer
-                        }
-                        else
+                        if (!m.ExcludeIfNull)
                         {
                             // Write the key
                             EmitWriteKey();
 
-                            // No value, write "null:
-                            il.Emit(OpCodes.Pop);
+                            // No value, write "null"
+                            il.Emit(OpCodes.Ldarg_0);
                             il.Emit(OpCodes.Ldstr, "null");
                             il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
                         }
-                        il.Emit(OpCodes.Br_S, lblFinished);
+                        il.Emit(OpCodes.Br_S, lblFinishedMember);
 
                         // Get it's value
                         il.MarkLabel(lblHasValue);
-                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldloca, locValue);
                         il.Emit(OpCodes.Call, memberType.GetProperty("Value").GetGetMethod());
 
                         // Switch to the underlying type from here on
+                        locValue = il.DeclareLocal(typeUnderlying);
+                        il.Emit(OpCodes.Stloc, locValue);
                         memberType = typeUnderlying;
-                        NeedValueAddress = (memberType.IsValueType && (toStringTypes.Contains(memberType) || otherSupportedTypes.Contains(memberType)));
-
-                        // Work out again if we need the address of the value
-                        if (NeedValueAddress)
-                        {
-                            var locTemp = il.DeclareLocal(memberType);
-                            il.Emit(OpCodes.Stloc, locTemp);
-                            il.Emit(OpCodes.Ldloca, locTemp);
-                        }
                     }
                     else
                     {
                         if (m.ExcludeIfNull && !type.IsValueType)
                         {
-                            var lblContinue = il.DefineLabel();
-                            System.Diagnostics.Debug.Assert(!NeedValueAddress);
-                            il.Emit(OpCodes.Dup);
-                            il.Emit(OpCodes.Brtrue_S, lblContinue);
-
-                            il.Emit(OpCodes.Pop);           // Pop value
-                            il.Emit(OpCodes.Pop);           // Pop writer
-
-                            // Define some labels
-                            il.Emit(OpCodes.Br_S, lblFinished);
-
-                            il.MarkLabel(lblContinue);
+                            il.Emit(OpCodes.Ldloc, locValue);
+                            il.Emit(OpCodes.Brfalse_S, lblFinishedMember);
                         }
+                    }
 
-                        EmitWriteKey();
+                    if (m.ExcludeIfEquals != null)
+                    {
+                        il.Emit(OpCodes.Ldloc, locValue);
+                        var targetValue = Convert.ChangeType(m.ExcludeIfEquals, m.MemberType);
+                        LoadContantFromObject(il, targetValue);
+                        il.Emit(OpCodes.Ceq);
+                        il.Emit(OpCodes.Brtrue_S, lblFinishedMember);
                     }
 
                     // ToString()
                     if (toStringTypes.Contains(memberType))
                     {
-                        // Convert to string
+                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(memberType.IsValueType ? OpCodes.Ldloca : OpCodes.Ldloc, locValue);
                         il.Emit(OpCodes.Ldloc, locInvariant);
                         il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(IFormatProvider) }));
                         il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteRaw", new Type[] { typeof(string) }));
@@ -268,6 +218,9 @@ namespace Topten.JsonKit
                     // ToString("R")
                     else if (memberType == typeof(float) || memberType == typeof(double))
                     {
+                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(memberType.IsValueType ? OpCodes.Ldloca : OpCodes.Ldloc, locValue);
                         il.Emit(OpCodes.Ldstr, "R");
                         il.Emit(OpCodes.Ldloc, locInvariant);
                         il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { typeof(string), typeof(IFormatProvider) }));
@@ -277,12 +230,18 @@ namespace Topten.JsonKit
                     // String?
                     else if (memberType == typeof(string))
                     {
+                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldloc, locValue);
                         il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
                     }
 
                     // Char?
                     else if (memberType == typeof(char))
                     {
+                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldloca, locValue);
                         il.Emit(OpCodes.Call, memberType.GetMethod("ToString", new Type[] { }));
                         il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteStringLiteral", new Type[] { typeof(string) }));
                     }
@@ -290,8 +249,11 @@ namespace Topten.JsonKit
                     // Bool?
                     else if (memberType == typeof(bool))
                     {
+                        EmitWriteKey();
+                        il.Emit(OpCodes.Ldarg_0);
                         var lblTrue = il.DefineLabel();
                         var lblCont = il.DefineLabel();
+                        il.Emit(OpCodes.Ldloc, locValue);
                         il.Emit(OpCodes.Brtrue_S, lblTrue);
                         il.Emit(OpCodes.Ldstr, "false");
                         il.Emit(OpCodes.Br_S, lblCont);
@@ -305,15 +267,28 @@ namespace Topten.JsonKit
 
                     else
                     {
-                        // Unsupported type, pass through
+                        // Load writer
+                        il.Emit(OpCodes.Ldarg_0);
+
+                        // Load value
+                        il.Emit(OpCodes.Ldloc, locValue);
                         if (memberType.IsValueType)
-                        {
                             il.Emit(OpCodes.Box, memberType);
+
+                        // Write the key and value
+                        if (m.ExcludeIfEmpty)
+                        {
+                            il.Emit(OpCodes.Ldstr, m.JsonKey);
+                            il.Emit(OpCodes.Call, typeof(Emit).GetMethod("WriteKeyAndValueCheckIfEmpty"));
                         }
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteValue", new Type[] { typeof(object) }));
+                        else
+                        {
+                            EmitWriteKey();
+                            il.Emit(OpCodes.Callvirt, typeof(IJsonWriter).GetMethod("WriteValue", new Type[] { typeof(object) }));
+                        }
                     }
 
-                    il.MarkLabel(lblFinished);
+                    il.MarkLabel(lblFinishedMember);
                 }
 
                 // Call IJsonWritten
@@ -347,6 +322,58 @@ namespace Topten.JsonKit
                     });
                 };
             }
+        }
+
+        static void LoadContantFromObject(ILGenerator il, object value)
+        {
+            switch (Type.GetTypeCode(value.GetType()))
+            {
+                case TypeCode.Boolean:
+                    il.Emit(OpCodes.Ldc_I4, ((bool)value) ? 1 : 0);
+                    break;
+
+                case TypeCode.Char:
+                case TypeCode.SByte:
+                case TypeCode.Byte:
+                case TypeCode.Int16:
+                case TypeCode.UInt16:
+                case TypeCode.Int32:
+                case TypeCode.UInt32:
+                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                    break;
+
+                case TypeCode.Int64:
+                case TypeCode.UInt64:
+                    il.Emit(OpCodes.Ldc_I8, (long)value);
+                    break;
+
+                case TypeCode.Single:
+                    il.Emit(OpCodes.Ldc_R4, (float)value);
+                    break;
+
+                case TypeCode.Double:
+                    il.Emit(OpCodes.Ldc_R8, (double)value);
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"JsonKit doesn't support the type `{value.GetType().ToString()}` for ExcludeIfEquals");
+            }
+        }
+
+        public static void WriteKeyAndValueCheckIfEmpty(IJsonWriter w, object o, string key)
+        {
+            if (o == null)
+                return;
+
+            // Check if empty
+            if (o is System.Collections.IEnumerable e)
+            {
+                if (!e.GetEnumerator().MoveNext())
+                    return;
+            }
+
+            w.WriteKeyNoEscaping(key);
+            w.WriteValue(o);
         }
 
         // Pseudo box lets us pass a value type by reference.  Used during 

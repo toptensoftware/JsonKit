@@ -36,6 +36,12 @@ namespace Topten.JsonKit
         // True if should be excluded when null
         public bool ExcludeIfNull => Attribute?.ExcludeIfNull ?? false;
 
+        // True if should be excluded when collection is empty
+        public bool ExcludeIfEmpty => Attribute?.ExcludeIfEmpty ?? false;
+
+        // True if should be excluded when value is equal to a specified value
+        public object ExcludeIfEquals => Attribute?.ExcludeIfEquals;
+
         // The JSON attribute for the member info
         public JsonAttribute Attribute
         {

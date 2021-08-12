@@ -107,12 +107,19 @@ namespace Topten.JsonKit
 
         /// <summary>
         /// For collection types controls whether they should be serialized
-        /// if the collection is empty.
+        /// if the collection is empty or null
         /// </summary>
         public bool ExcludeIfEmpty
         {
             get;
             set;
         }
+        
+        public object ExcludeIfEquals
+        {
+            get;
+            set;
+        }
+
     }
 }

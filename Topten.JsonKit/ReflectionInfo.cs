@@ -76,8 +76,21 @@ namespace Topten.JsonKit
                 {
                     // Exclude null?
                     var mval = jmi.GetValue(val);
-                    if (mval == null && jmi.ExcludeIfNull)
+                    if (jmi.ExcludeIfNull && mval == null)
                         continue;
+                    if (jmi.ExcludeIfEmpty)
+                    {
+                        if (mval == null)
+                            continue;
+
+                        if (mval is System.Collections.IEnumerable e && !e.GetEnumerator().MoveNext())
+                            continue;
+                    }
+                    if (jmi.ExcludeIfEquals != null)
+                    {
+                        if (jmi.ExcludeIfEquals.Equals(mval))
+                            continue;
+                    }
 
                     w.WriteKeyNoEscaping(jmi.JsonKey);
                     w.WriteValue(mval);
