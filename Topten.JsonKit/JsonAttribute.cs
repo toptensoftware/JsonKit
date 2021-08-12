@@ -115,6 +115,9 @@ namespace Topten.JsonKit
             set;
         }
         
+        /// <summary>
+        /// Used to simple value types that match a specific value
+        /// </summary>
         public object ExcludeIfEquals
         {
             get;
