@@ -87,7 +87,7 @@ namespace Topten.JsonKit
             if (tItf == typeof(IEnumerable))
                 return typeof(List<object>);
 
-            // IDicitonary -> Dictionary<string,object>
+            // IDictionary -> Dictionary<string,object>
             if (tItf == typeof(IDictionary))
                 return typeof(Dictionary<string, object>);
             return tItf;
