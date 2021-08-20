@@ -62,7 +62,7 @@ namespace Topten.JsonKit
         /// Reads a dictinary from the input stream
         /// </summary>
         /// <param name="callback">A callback that will be invoked for each encountered dictionary key</param>
-        void ParseDictionary(Action<string> callback);
+        void ParseDictionary(Type keyType, Action<object> callback);
 
         /// <summary>
         /// Reads an array from the input stream
@@ -103,6 +103,26 @@ namespace Topten.JsonKit
         {
             return (T)ReadLiteralNumber(reader, typeof(T));
         }
+
+
+        /// <summary>
+        /// Reads a dictionary from the input stream
+        /// </summary>
+        /// <param name="callback">A callback that will be invoked for each encountered dictionary key</param>
+        public static void ParseDictionary(this IJsonReader reader, Action<string> callback)
+        {
+            reader.ParseDictionary<string>(callback);
+        }
+
+        /// <summary>
+        /// Reads a dictionary from the input stream
+        /// </summary>
+        /// <param name="callback">A callback that will be invoked for each encountered dictionary key</param>
+        public static void ParseDictionary<T>(this IJsonReader reader, Action<T> callback)
+        {
+            reader.ParseDictionary(typeof(T), (o) => callback((T)o));
+        }
+
 
         /// <summary>
         /// Read a literal number

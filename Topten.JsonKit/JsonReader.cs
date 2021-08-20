@@ -69,6 +69,16 @@ namespace Topten.JsonKit
                     throw new CancelReaderException();
                 return reader.ReadLiteral(literal => Convert.FromBase64String((string)Convert.ChangeType(literal, typeof(string), CultureInfo.InvariantCulture)));
             });
+            _parsers.Set(typeof(Guid), (reader, type) =>
+            {
+                return (Guid)reader.ReadLiteral((val) =>
+                {
+                    if (val is string str)
+                        return new Guid(str);
+                    throw new InvalidDataException("Expected string guid");
+                });
+            });
+
         }
 
         /// <summary>
@@ -227,10 +237,10 @@ namespace Topten.JsonKit
                     _tokenizer.Skip(Token.OpenBrace);
 
                     // First pass to work out type
-                    ParseDictionaryKeys(key =>
+                    ParseDictionaryKeys(typeof(string), key =>
                     {
                         // Try to instantiate the object
-                        into = factory(this, key);
+                        into = factory(this, (string)key);
                         return into == null;
                     });
 
@@ -322,7 +332,7 @@ namespace Topten.JsonKit
             if (_tokenizer.CurrentToken == Token.OpenBrace && (type.IsAssignableFrom(typeof(IDictionary<string, object>))))
             {
                 var container = (new ExpandoObject()) as IDictionary<string, object>;
-                ParseDictionary(key =>
+                this.ParseDictionary(key =>
                 {
                     container[key] = Parse(typeof(Object));
                 });
@@ -404,9 +414,9 @@ namespace Topten.JsonKit
                 // Parse it
                 IDictionary dict = (IDictionary)into;
                 dict.Clear();
-                ParseDictionary(key =>
+                this.ParseDictionary(typeKey, key =>
                 {
-                    dict.Add(Convert.ChangeType(key, typeKey), Parse(typeValue));
+                    dict.Add(key, Parse(typeValue));
                 });
 
                 return;
@@ -435,7 +445,7 @@ namespace Topten.JsonKit
             if (objDict != null)
             {
                 objDict.Clear();
-                ParseDictionary(key =>
+                this.ParseDictionary(key =>
                 {
                     objDict[key] = Parse(typeof(Object));
                 });
@@ -490,42 +500,46 @@ namespace Topten.JsonKit
         }
 
         /// <inheritdoc />
-        public void ParseDictionary(Action<string> callback)
+        public void ParseDictionary(Type typeKey, Action<object> callback)
         {
             _tokenizer.Skip(Token.OpenBrace);
-            ParseDictionaryKeys(key => { callback(key); return true; });
+            ParseDictionaryKeys(typeKey, key => { callback(key); return true; });
             _tokenizer.Skip(Token.CloseBrace);
         }
 
         // Parse dictionary keys, calling callback for each one.  Continues until end of input
         // or when callback returns false
-        private void ParseDictionaryKeys(Func<string, bool> callback)
+        private void ParseDictionaryKeys(Type typeKey, Func<object, bool> callback)
         {
             // End?
             while (_tokenizer.CurrentToken != Token.CloseBrace)
             {
                 // Parse the key
-                string key = null;
+                object key = null;
                 if (_tokenizer.CurrentToken == Token.Identifier && (_options & JsonOptions.StrictParser)==0)
                 {
+                    if (typeKey != typeof(string))
+                    {
+                        throw new NotImplementedException("Identifier keys can only be used with dictionaries with string keys");
+                    }
                     key = _tokenizer.String;
+                    _tokenizer.NextToken();
                 }
-                else if (_tokenizer.CurrentToken == Token.Literal && _tokenizer.LiteralKind == LiteralKind.String)
+                else if (_tokenizer.CurrentToken == Token.Literal)
                 {
-                    key = (string)_tokenizer.LiteralValue;
+                    key = Parse(typeKey);
                 }
                 else
                 {
                     throw new InvalidDataException("syntax error, expected string literal or identifier");
                 }
-                _tokenizer.NextToken();
                 _tokenizer.Skip(Token.Colon);
 
                 // Remember current position
                 var pos = _tokenizer.CurrentTokenPosition;
 
                 // Call the callback, quit if cancelled
-                _contextStack.Add(key);
+                _contextStack.Add(key.ToString());
                 bool doDefaultProcessing = callback(key);
                 _contextStack.RemoveAt(_contextStack.Count-1);
                 if (!doDefaultProcessing)
