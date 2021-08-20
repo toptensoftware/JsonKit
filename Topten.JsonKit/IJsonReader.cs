@@ -13,6 +13,8 @@
 // and limitations under the License.
 
 using System;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
 
 
@@ -84,5 +86,61 @@ namespace Topten.JsonKit
         /// Moves to the next token in the input stream
         /// </summary>
         void NextToken();
+    }
+
+    /// <summary>
+    /// Helper functions for working with IJsonReader
+    /// </summary>
+    public static class IJsonReaderExtensions
+    {
+        /// <summary>
+        /// Read a literal number
+        /// </summary>
+        /// <typeparam name="T">The number type</typeparam>
+        /// <param name="reader">The reader to read from</param>
+        /// <returns>A number of specified type, or throws an InvalidDataException</returns>
+        public static T ReadLiteralNumber<T>(this IJsonReader reader)
+        {
+            return (T)ReadLiteralNumber(reader, typeof(T));
+        }
+
+        /// <summary>
+        /// Read a literal number
+        /// </summary>
+        /// <param name="reader">The reader to read from</param>
+        /// <param name="type">The number type to return</param>
+        /// <returns>A number of specified type, or throws an InvalidDataException</returns>
+        public static object ReadLiteralNumber(this IJsonReader reader, Type type)
+        {
+            switch (reader.GetLiteralKind())
+            {
+                case LiteralKind.SignedInteger:
+                case LiteralKind.UnsignedInteger:
+                    {
+                        var str = reader.GetLiteralString();
+                        if (str.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            var tempValue = Convert.ToUInt64(str.Substring(2), 16);
+                            object val = Convert.ChangeType(tempValue, type, CultureInfo.InvariantCulture);
+                            reader.NextToken();
+                            return val;
+                        }
+                        else
+                        {
+                            object val = Convert.ChangeType(str, type, CultureInfo.InvariantCulture);
+                            reader.NextToken();
+                            return val;
+                        }
+                    }
+
+                case LiteralKind.FloatingPoint:
+                    {
+                        object val = Convert.ChangeType(reader.GetLiteralString(), type, CultureInfo.InvariantCulture);
+                        reader.NextToken();
+                        return val;
+                    }
+            }
+            throw new InvalidDataException("expected a numeric literal");
+        }
     }
 }
