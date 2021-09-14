@@ -137,6 +137,11 @@ namespace Topten.JsonKit
         {
             switch (reader.GetLiteralKind())
             {
+                case LiteralKind.String:
+                    var value = Convert.ChangeType(reader.GetLiteralString(), type, CultureInfo.InvariantCulture);
+                    reader.NextToken();
+                    return value;
+
                 case LiteralKind.SignedInteger:
                 case LiteralKind.UnsignedInteger:
                     {
