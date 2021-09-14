@@ -275,7 +275,10 @@ namespace Topten.JsonKit
                     return ReadLiteral(literal => {
                         try
                         {
-                            return Enum.Parse(type, (string)literal);
+                            if (literal is string str)
+                                return Enum.Parse(type, str);
+                            else
+                                return Enum.ToObject(type, literal);
                         }
                         catch
                         {
