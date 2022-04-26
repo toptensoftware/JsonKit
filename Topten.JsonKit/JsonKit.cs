@@ -440,7 +440,7 @@ namespace Topten.JsonKit
         /// <param name="formatter">The formatter callback</param>
         public static void RegisterFormatter(Type type, Action<IJsonWriter, object> formatter)
         {
-            JsonWriter._formatters[type] = formatter;
+            JsonWriter._formatters.Set(type, formatter);
         }
 
         /// <summary>

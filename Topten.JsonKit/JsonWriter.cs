@@ -28,23 +28,23 @@ namespace Topten.JsonKit
             _formatterResolver = ResolveFormatter;
 
             // Register standard formatters
-            _formatters.Add(typeof(string), (w, o) => w.WriteStringLiteral((string)o));
-            _formatters.Add(typeof(char), (w, o) => w.WriteStringLiteral(((char)o).ToString()));
-            _formatters.Add(typeof(bool), (w, o) => w.WriteRaw(((bool)o) ? "true" : "false"));
+            _formatters.Set(typeof(string), (w, o) => w.WriteStringLiteral((string)o));
+            _formatters.Set(typeof(char), (w, o) => w.WriteStringLiteral(((char)o).ToString()));
+            _formatters.Set(typeof(bool), (w, o) => w.WriteRaw(((bool)o) ? "true" : "false"));
             Action<IJsonWriter, object> convertWriter = (w, o) => w.WriteRaw((string)Convert.ChangeType(o, typeof(string), System.Globalization.CultureInfo.InvariantCulture));
-            _formatters.Add(typeof(int), convertWriter);
-            _formatters.Add(typeof(uint), convertWriter);
-            _formatters.Add(typeof(long), convertWriter);
-            _formatters.Add(typeof(ulong), convertWriter);
-            _formatters.Add(typeof(short), convertWriter);
-            _formatters.Add(typeof(ushort), convertWriter);
-            _formatters.Add(typeof(decimal), convertWriter);
-            _formatters.Add(typeof(byte), convertWriter);
-            _formatters.Add(typeof(sbyte), convertWriter);
-            _formatters.Add(typeof(DateTime), (w, o) => convertWriter(w, Utils.ToUnixMilliseconds((DateTime)o)));
-            _formatters.Add(typeof(float), (w, o) => w.WriteRaw(((float)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
-            _formatters.Add(typeof(double), (w, o) => w.WriteRaw(((double)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
-            _formatters.Add(typeof(byte[]), (w, o) =>
+            _formatters.Set(typeof(int), convertWriter);
+            _formatters.Set(typeof(uint), convertWriter);
+            _formatters.Set(typeof(long), convertWriter);
+            _formatters.Set(typeof(ulong), convertWriter);
+            _formatters.Set(typeof(short), convertWriter);
+            _formatters.Set(typeof(ushort), convertWriter);
+            _formatters.Set(typeof(decimal), convertWriter);
+            _formatters.Set(typeof(byte), convertWriter);
+            _formatters.Set(typeof(sbyte), convertWriter);
+            _formatters.Set(typeof(DateTime), (w, o) => convertWriter(w, Utils.ToUnixMilliseconds((DateTime)o)));
+            _formatters.Set(typeof(float), (w, o) => w.WriteRaw(((float)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+            _formatters.Set(typeof(double), (w, o) => w.WriteRaw(((double)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+            _formatters.Set(typeof(byte[]), (w, o) =>
             {
                 w.WriteRaw("\"");
                 w.WriteRaw(Convert.ToBase64String((byte[])o));
@@ -53,7 +53,7 @@ namespace Topten.JsonKit
         }
 
         public static Func<Type, Action<IJsonWriter, object>> _formatterResolver;
-        public static Dictionary<Type, Action<IJsonWriter, object>> _formatters = new Dictionary<Type, Action<IJsonWriter, object>>();
+        public static ThreadSafeCache<Type, Action<IJsonWriter, object>> _formatters = new ThreadSafeCache<Type, Action<IJsonWriter, object>>();
 
         static Action<IJsonWriter, object> ResolveFormatter(Type type)
         {
@@ -339,7 +339,7 @@ namespace Topten.JsonKit
             var formatter = _formatterResolver(type);
             if (formatter != null)
             {
-                _formatters[type] = formatter;
+                _formatters.Set(type, formatter);
                 formatter(this, value);
                 return;
             }
