@@ -444,6 +444,34 @@ namespace Topten.JsonKit
         }
 
         /// <summary>
+        /// Register a callback that to format the key values of dictionaries
+        /// </summary>
+        /// <remarks>
+        /// These formatters are only used when writing .NET dictionary 
+        /// key instances - not when writing properties names.
+        /// </remarks>
+        /// <param name="type">The type of object to be formatted</param>
+        /// <param name="formatter">The formatter callback</param>
+        public static void RegisterKeyFormatter(Type type, Func<object, string> formatter)
+        {
+            JsonWriter._keyFormatters.Set(type, formatter);
+        }
+
+        /// <summary>
+        /// Register a callback that to format the key values of dictionaries
+        /// </summary>
+        /// <remarks>
+        /// These formatters are only used when writing .NET dictionary 
+        /// key instances - not when writing properties names.
+        /// </remarks>
+        /// <typeparam name="T">The type of object to be formatted</typeparam>
+        /// <param name="formatter">The formatter callback</param>
+        public static void RegisterKeyFormatter<T>(Func<T, string> formatter)
+        {
+            JsonWriter._keyFormatters.Set(typeof(T), (o) => formatter((T)o));
+        }
+
+        /// <summary>
         /// Register a callback that can format a value of a particular type into json 
         /// </summary>
         /// <typeparam name="T">The type of object to be formatted</typeparam>

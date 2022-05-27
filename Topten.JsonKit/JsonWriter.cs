@@ -54,6 +54,7 @@ namespace Topten.JsonKit
 
         public static Func<Type, Action<IJsonWriter, object>> _formatterResolver;
         public static ThreadSafeCache<Type, Action<IJsonWriter, object>> _formatters = new ThreadSafeCache<Type, Action<IJsonWriter, object>>();
+        public static ThreadSafeCache<Type, Func<object, string>> _keyFormatters = new ThreadSafeCache<Type, Func<object, string>>();
 
         static Action<IJsonWriter, object> ResolveFormatter(Type type)
         {
@@ -128,6 +129,22 @@ namespace Topten.JsonKit
             if (_currentBlockKind != '[')
                 throw new InvalidOperationException("Attempt to write array element when not in array block");
             NextElement();
+        }
+
+        // Writes a dictionary key using custom formatter if available
+        void WriteDictionaryKey(object value)
+        {
+            string str;
+            Func<object, string> formatter;
+            if (_keyFormatters.TryGetValue(value.GetType(), out formatter))
+            {
+                str = formatter(value);
+            }
+            else
+            {
+                str = value.ToString();
+            }
+            WriteKey(str);
         }
 
         // Write next dictionary key
@@ -298,7 +315,7 @@ namespace Topten.JsonKit
                 {
                     foreach (var key in d.Keys)
                     {
-                        WriteKey(key.ToString());
+                        WriteDictionaryKey(key);
                         WriteValue(d[key]);
                     }
                 });
@@ -313,7 +330,7 @@ namespace Topten.JsonKit
                 {
                     foreach (var key in dso.Keys)
                     {
-                        WriteKey(key.ToString());
+                        WriteDictionaryKey(key);
                         WriteValue(dso[key]);
                     }
                 });
