@@ -13,6 +13,7 @@
 // and limitations under the License.
 
 using System;
+using System.Reflection;
 
 namespace Topten.JsonKit
 {
@@ -37,6 +38,7 @@ namespace Topten.JsonKit
     /// When using DataMember, the name of the field or property is used as is - the first letter is left in upper case
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
+    [Obfuscation(Exclude = true, ApplyToMembers = true)]        // Don't obfuscate because we use reflection to get function names
     public class JsonAttribute : Attribute
     {
         /// <summary>
