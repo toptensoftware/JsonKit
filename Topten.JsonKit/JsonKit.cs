@@ -444,7 +444,7 @@ namespace Topten.JsonKit
         }
 
         /// <summary>
-        /// Register a callback that to format the key values of dictionaries
+        /// Register a callback to format the key values of dictionaries
         /// </summary>
         /// <remarks>
         /// These formatters are only used when writing .NET dictionary 
@@ -458,7 +458,7 @@ namespace Topten.JsonKit
         }
 
         /// <summary>
-        /// Register a callback that to format the key values of dictionaries
+        /// Register a callback to format the key values of dictionaries
         /// </summary>
         /// <remarks>
         /// These formatters are only used when writing .NET dictionary 
