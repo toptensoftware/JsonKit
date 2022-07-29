@@ -184,10 +184,20 @@ namespace Topten.JsonKit
                 var allMembers = Utils.GetAllFieldsAndProperties(type); 
 
                 // Does type have a [Json] attribute
-                bool typeMarked = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().Any();
+                var typeAttr = type.GetCustomAttributes(typeof(JsonAttribute), true).OfType<JsonAttribute>().FirstOrDefault();
+                bool typeMarked = typeAttr != null;
 
                 // Do any members have a [Json] attribute
                 bool anyFieldsMarked = allMembers.Any(x => x.GetCustomAttributes(typeof(JsonAttribute), false).OfType<JsonAttribute>().Any());
+
+                // If the type is marked with [Json(ExplicitFieldsOnly = true)] then ignore the type attribute
+                // and only serialize fields explicitly marked.
+                if (typeAttr != null && typeAttr.ExplicitMembersOnly)
+                {
+                    anyFieldsMarked = true;
+                    typeAttr = null;
+                    typeMarked = false;
+                }
 
                 // Try with DataContract and friends
                 if (!typeMarked && !anyFieldsMarked && type.GetCustomAttributes(typeof(DataContractAttribute), true).OfType<DataContractAttribute>().Any())
@@ -265,8 +275,10 @@ namespace Topten.JsonKit
             }
 
             // Must have some members
+            /*
             if (!members.Any() && !Attribute.IsDefined(type, typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
                 return null;
+            */
 
             // Create reflection info
             return new ReflectionInfo() { Members = members };

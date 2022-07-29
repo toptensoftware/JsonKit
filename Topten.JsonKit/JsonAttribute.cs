@@ -126,5 +126,15 @@ namespace Topten.JsonKit
             set;
         }
 
+        /// <summary>
+        /// If no members are marked with JSON attributes, don't try to serialize
+        /// the whole type - instead serialize as an empty object.
+        /// </summary>
+        public bool ExplicitMembersOnly
+        {
+            get;
+            set;
+        }
+
     }
 }
