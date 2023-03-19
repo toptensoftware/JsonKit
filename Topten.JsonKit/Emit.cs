@@ -343,8 +343,11 @@ namespace Topten.JsonKit
                     break;
 
                 case TypeCode.Int64:
-                case TypeCode.UInt64:
                     il.Emit(OpCodes.Ldc_I8, (long)value);
+                    break;
+
+                case TypeCode.UInt64:
+                    il.Emit(OpCodes.Ldc_I8, (long)(ulong)value);
                     break;
 
                 case TypeCode.Single:

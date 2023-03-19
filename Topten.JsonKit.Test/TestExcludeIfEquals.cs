@@ -37,6 +37,10 @@ namespace TestCases
 
             [Json("enumProperty", ExcludeIfEquals = Fruit.Apples)]
             public Fruit enumProperty { get; set; }
+
+            [Json("ulongProperty", ExcludeIfEquals = 0UL)]
+            public ulong ulongProperty { get; set; }
+
         }
 
         public static object GetDefault(Type type)
@@ -57,6 +61,7 @@ namespace TestCases
                 intField = 0,
                 boolProperty = false,
                 intProperty = 0,
+                ulongProperty = 0,
                 enumField = Fruit.Apples,
                 enumProperty = Fruit.Apples,
             };
@@ -70,6 +75,7 @@ namespace TestCases
             Assert.DoesNotContain("\"boolProperty\":", json);
             Assert.DoesNotContain("\"intProperty\":", json);
             Assert.DoesNotContain("\"enumField\":", json);
+            Assert.DoesNotContain("\"ulongProperty\":", json);
             Assert.DoesNotContain("\"enumProperty\":", json);
         }
 
@@ -82,6 +88,7 @@ namespace TestCases
                 intField = 23,
                 boolProperty = true,
                 intProperty = 24,
+                ulongProperty = 25,
                 enumField = Fruit.Pears,
                 enumProperty = Fruit.Bananas,
             };
@@ -96,6 +103,7 @@ namespace TestCases
             Assert.Contains("\"intProperty\":", json);
             Assert.Contains("\"enumField\":", json);
             Assert.Contains("\"enumProperty\":", json);
+            Assert.Contains("\"ulongProperty\":", json);
             Assert.Contains("true", json);
             Assert.Contains("23", json);
             Assert.Contains("24", json);
