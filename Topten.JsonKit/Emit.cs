@@ -673,33 +673,42 @@ namespace Topten.JsonKit
             // Now create the parseInto delegate
             Action<IJsonReader, object> parseInto = (reader, obj) =>
             {
-                // Call IJsonLoading
-                var loading = obj as IJsonLoading;
-                if (loading != null)
-                    loading.OnJsonLoading(reader);
-
-                // Cache IJsonLoadField
-                var lf = obj as IJsonLoadField;
-
-                // Read dictionary keys
-                reader.ParseDictionary(key =>
+                try
                 {
-                    // Call IJsonLoadField
-                    if (lf != null && lf.OnJsonField(reader, key))
-                        return;
+                    // Call IJsonLoading
+                    var loading = obj as IJsonLoading;
+                    if (loading != null)
+                        loading.OnJsonLoading(reader);
 
-                    // Call setters
-                    Action<IJsonReader, object> setter;
-                    if (setters.TryGetValue(key, out setter))
+                    // Cache IJsonLoadField
+                    var lf = obj as IJsonLoadField;
+
+                    // Read dictionary keys
+                    reader.ParseDictionary(key =>
                     {
-                        setter(reader, obj);
-                    }
-                });
+                        // Call IJsonLoadField
+                        if (lf != null && lf.OnJsonField(reader, key))
+                            return;
 
-                // Call IJsonLoaded
-                var loaded = obj as IJsonLoaded;
-                if (loaded != null)
-                    loaded.OnJsonLoaded(reader);
+                        // Call setters
+                        Action<IJsonReader, object> setter;
+                        if (setters.TryGetValue(key, out setter))
+                        {
+                            setter(reader, obj);
+                        }
+                    });
+
+                    // Call IJsonLoaded
+                    var loaded = obj as IJsonLoaded;
+                    if (loaded != null)
+                        loaded.OnJsonLoaded(reader);
+                }
+                catch (Exception x)
+                {
+                    var loadex = obj as IJsonLoadException;
+                    if (loadex != null)
+                        loadex.OnJsonLoadException(reader, x);
+                }
             };
 
             // Since we've created the ParseInto handler, we might as well register

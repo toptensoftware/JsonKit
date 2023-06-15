@@ -107,18 +107,27 @@ namespace Topten.JsonKit
         //     it also works for value types so we use the one method for both
         public void ParseInto(IJsonReader r, object into)
         {
-            var loading = into as IJsonLoading;
-            if (loading != null)
-                loading.OnJsonLoading(r);
-
-            r.ParseDictionary(key =>
+            try
             {
-                ParseFieldOrProperty(r, into, key);
-            });
+                var loading = into as IJsonLoading;
+                if (loading != null)
+                    loading.OnJsonLoading(r);
 
-            var loaded = into as IJsonLoaded;
-            if (loaded != null)
-                loaded.OnJsonLoaded(r);
+                r.ParseDictionary(key =>
+                {
+                    ParseFieldOrProperty(r, into, key);
+                });
+
+                var loaded = into as IJsonLoaded;
+                if (loaded != null)
+                    loaded.OnJsonLoaded(r);
+            }
+            catch (Exception x)
+            {
+                var loadex = into as IJsonLoadException;
+                if (loadex != null)
+                    loadex.OnJsonLoadException(r, x);
+            }
         }
 
         // The member info is stored in a list (as opposed to a dictionary) so that
