@@ -11,6 +11,7 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <TtsCodeSign>True</TtsCodeSign>
+    <TtsInheritDoc>True</TtsInheritDoc>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Copyright>Copyright © 2014-2026 Topten Software.  All Rights Reserved</Copyright>
