@@ -44,6 +44,42 @@ namespace TestCases
         }
     }
 
+    [Json]
+    class ObjectEvents : IJsonLoaded, IJsonLoading, IJsonLoadField, IJsonWriting, IJsonWritten
+    {
+        public int IntField;
+
+        [JsonExclude] public bool loading;
+        [JsonExclude] public bool loaded;
+        [JsonExclude] public bool fieldLoaded;
+
+        void IJsonLoaded.OnJsonLoaded(IJsonReader r)
+        {
+            loaded = true;
+        }
+
+        void IJsonLoading.OnJsonLoading(IJsonReader r)
+        {
+            loading = true;
+        }
+
+        bool IJsonLoadField.OnJsonField(IJsonReader r, string key)
+        {
+            fieldLoaded = true;
+            return false;
+        }
+
+        void IJsonWriting.OnJsonWriting(IJsonWriter w)
+        {
+            w.WriteRaw("/* OnJsonWriting */");
+        }
+
+        void IJsonWritten.OnJsonWritten(IJsonWriter w)
+        {
+            w.WriteRaw("/* OnJsonWritten */");
+        }
+    }
+
 
     [Obfuscation(Exclude = true, ApplyToMembers = true)]
     public class TestsEvents
@@ -61,6 +97,26 @@ namespace TestCases
         public void TestStructWriteEvents()
         {
             var o = new StructEvents();
+            o.IntField = 23;
+
+            var json = Json.Format(o);
+            Assert.Contains("OnJsonWriting", json);
+            Assert.Contains("OnJsonWritten", json);
+        }
+
+        [Fact]
+        public void TestObjectLoadEvents()
+        {
+            var o2 = Json.Parse<ObjectEvents>("{\"IntField\":23}");
+            Assert.True(o2.loading);
+            Assert.True(o2.loaded);
+            Assert.True(o2.fieldLoaded);
+        }
+
+        [Fact]
+        public void TestObjectWriteEvents()
+        {
+            var o = new ObjectEvents();
             o.IntField = 23;
 
             var json = Json.Format(o);

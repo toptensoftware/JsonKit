@@ -303,9 +303,9 @@ namespace Topten.JsonKit
                     else
                     {
                         il.Emit(OpCodes.Ldloc, locTypedObj);
-                        il.Emit(OpCodes.Castclass, typeof(IJsonWriting));
+                        il.Emit(OpCodes.Castclass, typeof(IJsonWritten));
                         il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, typeof(IJsonWriting).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
+                        il.Emit(OpCodes.Callvirt, typeof(IJsonWritten).GetMethod("OnJsonWritten", new Type[] { typeof(IJsonWriter) }));
                     }
                 }
 
