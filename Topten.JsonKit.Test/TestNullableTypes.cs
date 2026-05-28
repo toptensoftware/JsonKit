@@ -24,7 +24,7 @@ namespace TestCases
             var nc = new NullableContainer();
 
             var json = Json.Format(nc);
-            Console.WriteLine(json);
+            //Console.WriteLine(json);
             Assert.Contains("null", json);
 
             var nc2 = Json.Parse<NullableContainer>(json);
@@ -42,7 +42,7 @@ namespace TestCases
             };
 
             var json = Json.Format(nc);
-            Console.WriteLine(json);
+            //Console.WriteLine(json);
             Assert.DoesNotContain(json, "null");
 
             var nc2 = Json.Parse<NullableContainer>(json);

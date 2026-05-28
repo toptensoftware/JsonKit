@@ -120,7 +120,7 @@ namespace TestCases
             all.Double = double.MaxValue;
 
             var json = Json.Format(all);
-            Console.WriteLine(json);
+            //Console.WriteLine(json);
             var all2 = Json.Parse<AllTypes>(json);
             Compare(all, all2);
         }
@@ -145,7 +145,7 @@ namespace TestCases
             all.Blob = null;
 
             var json = Json.Format(all);
-            Console.WriteLine(json);
+            //Console.WriteLine(json);
             var all2 = Json.Parse<AllTypes>(json);
             Compare(all, all2);
         }
